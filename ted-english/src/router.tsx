@@ -5,20 +5,28 @@ import { ErrorPage } from './pages/ErrorPage';
 import { HomePage } from './pages/HomePage';
 import { VideoPage } from './pages/VideoPage';
 
-export const router = createBrowserRouter([
+const normalizedBaseUrl =
+  import.meta.env.BASE_URL.replace(/\/+$/, '') || '/';
+
+export const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <RootLayout />,
+      errorElement: <ErrorPage />,
+      children: [
+        {
+          index: true,
+          element: <HomePage />,
+        },
+        {
+          path: 'videos/:videoId',
+          element: <VideoPage />,
+        },
+      ],
+    },
+  ],
   {
-    path: '/',
-    element: <RootLayout />,
-    errorElement: <ErrorPage />,
-    children: [
-      {
-        index: true,
-        element: <HomePage />,
-      },
-      {
-        path: 'videos/:videoId',
-        element: <VideoPage />,
-      },
-    ],
-  },
-]);
+    basename: normalizedBaseUrl === '' ? '/' : normalizedBaseUrl,
+  }
+);
