@@ -10,6 +10,8 @@ export const VideoHero = ({ video }: VideoHeroProps) => {
   const durationLabel = video.duration || '재생시간 미정';
   const speakerLabel = video.speaker || 'TED Speaker';
   const description = video.shortDescription || '이 강연의 상세 설명은 준비 중입니다.';
+  const { embedUrl, watchUrl, providerName } = video.source;
+  const hasEmbed = Boolean(embedUrl);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950">
@@ -46,21 +48,43 @@ export const VideoHero = ({ video }: VideoHeroProps) => {
           </div>
         </div>
         <div className="relative aspect-video overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-lg shadow-brand-500/10">
-          {video.youtubeId ? (
+          {hasEmbed ? (
             <iframe
               className="h-full w-full"
-              src={`https://www.youtube.com/embed/${video.youtubeId}`}
+              src={embedUrl}
               title={video.title}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               loading="lazy"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-950 text-sm text-slate-400">
-              영상 링크를 불러오는 중입니다.
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-950 px-6 text-center text-sm text-slate-400">
+              <span>영상 임베드를 불러오지 못했습니다.</span>
+              {watchUrl ? (
+                <a
+                  href={watchUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:bg-brand-400"
+                >
+                  {providerName}에서 시청하기
+                </a>
+              ) : null}
             </div>
           )}
         </div>
+        {watchUrl ? (
+          <div className="lg:col-span-2 lg:flex lg:justify-end">
+            <a
+              href={watchUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-brand-400"
+            >
+              {providerName}에서 원본 영상 보기
+            </a>
+          </div>
+        ) : null}
       </div>
     </section>
   );
