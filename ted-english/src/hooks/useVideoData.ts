@@ -11,7 +11,9 @@ const YOUTUBE_PROXY_PREFIXES = [
   'https://cors.isomorphic-git.org/https://www.youtube.com/feeds/videos.xml?channel_id=',
 ];
 
-const DEFAULT_TED_QUERY = 'language=en&order=newest&per_page=30';
+const MINIMUM_REMOTE_VIDEOS = 30;
+const MAX_TED_PAGES = 4;
+const DEFAULT_TED_QUERY = 'language=en&order=newest&per_page=100';
 const TED_PRIMARY_API = `https://tedcdnpi-a.akamaihd.net/api/tedweb/talks.json?${DEFAULT_TED_QUERY}`;
 const TED_SECONDARY_API = `https://www.ted.com/talks?${DEFAULT_TED_QUERY}&format=json`;
 const TED_PROXY_CANDIDATES = [
@@ -189,46 +191,115 @@ const buildTedSource = (slugOrId: string, explicitUrl?: string): VideoSource => 
 
 type UnknownRecord = Record<string, unknown>;
 
-const extractImageUrl = (value: unknown): string => {
-  if (isNonEmptyString(value)) {
-    return value;
+const normaliseImageUrl = (value: string) => {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return '';
   }
 
-  if (value && typeof value === 'object') {
+  if (trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return `https://www.ted.com${trimmed}`;
+  }
+
+  if (trimmed.startsWith('http://')) {
+    return `https://${trimmed.slice('http://'.length)}`;
+  }
+
+  return trimmed;
+};
+
+const extractImageUrl = (value: unknown, visited = new Set<unknown>()): string => {
+  if (!value || visited.has(value)) {
+    return '';
+  }
+
+  if (isNonEmptyString(value)) {
+    return normaliseImageUrl(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const candidate = extractImageUrl(item, visited);
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return '';
+  }
+
+  if (typeof value === 'object') {
+    visited.add(value);
     const record = value as UnknownRecord;
 
-    if (isNonEmptyString(record.url)) {
-      return record.url;
-    }
+    const prioritizedKeys = [
+      'url',
+      'src',
+      'image',
+      'image_url',
+      'imageUrl',
+      'image_large',
+      'imageLarge',
+      'image_medium',
+      'imageMedium',
+      'image_small',
+      'imageSmall',
+      'hero',
+      'hero_image',
+      'heroImage',
+      'hero_image_url',
+      'primary_image',
+      'primaryImage',
+      'poster',
+      'poster_image',
+      'posterImage',
+      'thumbnail',
+      'thumb',
+      'still',
+      'square',
+      'landscape',
+      'portrait',
+      'large',
+      'medium',
+      'small',
+      'card',
+      'banner',
+      'cover',
+      'cover_image',
+      'coverImage',
+      'fallback',
+      'default',
+      'renditions',
+      'sources',
+      'sizes',
+      'atlas',
+      'files',
+    ];
 
-    if (isNonEmptyString(record.src)) {
-      return record.src;
-    }
-
-    if (isNonEmptyString(record.image)) {
-      return record.image;
-    }
-
-    if (record.image && typeof record.image === 'object') {
-      const nested = extractImageUrl(record.image);
-      if (nested) {
-        return nested;
+    for (const key of prioritizedKeys) {
+      if (key in record) {
+        const candidate = extractImageUrl(record[key], visited);
+        if (candidate) {
+          return candidate;
+        }
       }
     }
 
-    if (record.sizes && typeof record.sizes === 'object') {
-      const sizes = record.sizes as UnknownRecord;
-      const large = extractImageUrl(sizes.large);
-      if (large) {
-        return large;
+    for (const key of Object.keys(record)) {
+      if (prioritizedKeys.includes(key)) {
+        continue;
       }
-      const medium = extractImageUrl(sizes.medium);
-      if (medium) {
-        return medium;
-      }
-      const small = extractImageUrl(sizes.small);
-      if (small) {
-        return small;
+      const candidate = extractImageUrl(record[key], visited);
+      if (candidate) {
+        return candidate;
       }
     }
   }
@@ -352,6 +423,8 @@ const buildVideoFromTed = (entry: UnknownRecord): VideoDetail | null => {
     extractImageUrl(entry.hero) ||
     extractImageUrl(entry.primary_image) ||
     extractImageUrl(entry.image) ||
+    extractImageUrl(entry.thumbnail) ||
+    extractImageUrl(entry.media) ||
     'https://www.ted.com/favicon.ico';
 
   const tags = extractTags(entry.tags);
@@ -455,43 +528,81 @@ const buildTedApiCandidates = () => {
   return Array.from(new Set(urls.filter((value): value is string => Boolean(value))));
 };
 
+const appendPageToUrl = (endpoint: string, page: number) => {
+  if (/[?&]page=/.test(endpoint)) {
+    return endpoint.replace(/([?&]page=)(\d+)/, `$1${page}`);
+  }
+
+  const separator = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${separator}page=${page}`;
+};
+
+const fetchTedTalkPage = async (endpoint: string): Promise<VideoDetail[]> => {
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: 'application/json, text/plain;q=0.9',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`TED 데이터를 불러오지 못했습니다: ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  let payload: unknown;
+
+  if (contentType.includes('application/json')) {
+    payload = await response.json();
+  } else {
+    const textBody = await response.text();
+
+    try {
+      payload = JSON.parse(textBody);
+    } catch (parseError) {
+      throw parseError instanceof Error
+        ? parseError
+        : new Error('TED 데이터를 JSON으로 변환하는 데 실패했습니다.');
+    }
+  }
+
+  return parseTedResponse(payload);
+};
+
 const fetchTedTalks = async (): Promise<VideoDetail[]> => {
   const candidates = buildTedApiCandidates();
   let lastError: unknown;
 
   for (const endpoint of candidates) {
+    const aggregated: VideoDetail[] = [];
+    const seen = new Set<string>();
+
     try {
-      const response = await fetch(endpoint, {
-        headers: {
-          Accept: 'application/json, text/plain;q=0.9',
-        },
-      });
+      for (let page = 1; page <= MAX_TED_PAGES; page += 1) {
+        const pageUrl = appendPageToUrl(endpoint, page);
+        const pageResults = await fetchTedTalkPage(pageUrl);
 
-      if (!response.ok) {
-        throw new Error(`TED 데이터를 불러오지 못했습니다: ${response.status}`);
-      }
+        if (pageResults.length === 0 && page === 1) {
+          break;
+        }
 
-      const contentType = response.headers.get('content-type') ?? '';
-      let payload: unknown;
+        for (const video of pageResults) {
+          if (!seen.has(video.id)) {
+            aggregated.push(video);
+            seen.add(video.id);
+          }
+        }
 
-      if (contentType.includes('application/json')) {
-        payload = await response.json();
-      } else {
-        const textBody = await response.text();
+        if (aggregated.length >= MINIMUM_REMOTE_VIDEOS) {
+          return aggregated;
+        }
 
-        try {
-          payload = JSON.parse(textBody);
-        } catch (parseError) {
-          throw parseError instanceof Error
-            ? parseError
-            : new Error('TED 데이터를 JSON으로 변환하는 데 실패했습니다.');
+        if (pageResults.length === 0) {
+          break;
         }
       }
 
-      const parsed = parseTedResponse(payload);
-
-      if (parsed.length > 0) {
-        return parsed;
+      if (aggregated.length > 0) {
+        return aggregated;
       }
     } catch (error) {
       lastError = error;
@@ -614,6 +725,36 @@ const fetchYoutubeVideos = async (): Promise<VideoDetail[]> => {
   return [];
 };
 
+const createVideoKey = (video: VideoDetail) => {
+  const provider = video.source?.type ?? 'unknown';
+  return `${provider}:${video.id}`;
+};
+
+const dedupeVideos = (items: VideoDetail[]): VideoDetail[] => {
+  const seen = new Set<string>();
+  const results: VideoDetail[] = [];
+
+  items.forEach((video) => {
+    const key = createVideoKey(video);
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push(video);
+    }
+  });
+
+  return results;
+};
+
+const sortVideosByPublishedAt = (items: VideoDetail[]) => {
+  return [...items].sort((a, b) => {
+    const left = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+    const right = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+
+    return right - left;
+  });
+};
+
 const mergeWithLocal = (video: VideoDetail): VideoDetail => {
   const local = videosById[video.id];
 
@@ -632,6 +773,7 @@ const mergeWithLocal = (video: VideoDetail): VideoDetail => {
   return {
     ...local,
     ...video,
+    thumbnailUrl: video.thumbnailUrl || local.thumbnailUrl,
     duration: video.duration || local.duration,
     tags: video.tags.length > 0 ? video.tags : local.tags,
     shortDescription: video.shortDescription || local.shortDescription,
@@ -649,30 +791,43 @@ const useVideoLibrary = () => {
     let isMounted = true;
 
     const fetchVideos = async () => {
-      const strategies: Array<() => Promise<VideoDetail[]>> = [fetchTedTalks, fetchYoutubeVideos];
-      let lastError: unknown;
+      const errors: unknown[] = [];
+      let aggregated: VideoDetail[] = [];
 
-      for (const strategy of strategies) {
+      try {
+        aggregated = await fetchTedTalks();
+      } catch (error) {
+        errors.push(error);
+      }
+
+      if (aggregated.length < MINIMUM_REMOTE_VIDEOS) {
         try {
-          const fetched = await strategy();
-
-          if (fetched.length > 0) {
-            const merged = fetched.map(mergeWithLocal);
-
-            if (isMounted) {
-              setRemoteVideos(merged);
-            }
-
-            return;
-          }
+          const youtubeVideos = await fetchYoutubeVideos();
+          aggregated = dedupeVideos([...aggregated, ...youtubeVideos]);
         } catch (error) {
-          lastError = error;
+          errors.push(error);
         }
       }
 
-      if (import.meta.env.DEV && lastError) {
+      if (aggregated.length > 0) {
+        const merged = dedupeVideos(aggregated).map(mergeWithLocal);
+        const sorted = sortVideosByPublishedAt(merged);
+
+        if (isMounted) {
+          setRemoteVideos(sorted);
+        }
+
+        if (import.meta.env.DEV && errors.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn(...errors);
+        }
+
+        return;
+      }
+
+      if (import.meta.env.DEV && errors.length > 0) {
         // eslint-disable-next-line no-console
-        console.error(lastError);
+        console.error(...errors);
       }
 
       if (isMounted) {
