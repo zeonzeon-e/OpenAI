@@ -811,7 +811,18 @@ const useVideoLibrary = () => {
 
       if (aggregated.length > 0) {
         const merged = dedupeVideos(aggregated).map(mergeWithLocal);
-        const sorted = sortVideosByPublishedAt(merged);
+        let finalVideos = dedupeVideos(merged);
+
+        if (finalVideos.length < MINIMUM_REMOTE_VIDEOS) {
+          const filler = videos.filter((video) => finalVideos.every((item) => item.id !== video.id));
+          finalVideos = dedupeVideos([...finalVideos, ...filler]);
+        }
+
+        if (finalVideos.length < MINIMUM_REMOTE_VIDEOS) {
+          finalVideos = [...finalVideos, ...videos].slice(0, MINIMUM_REMOTE_VIDEOS);
+        }
+
+        const sorted = sortVideosByPublishedAt(finalVideos);
 
         if (isMounted) {
           setRemoteVideos(sorted);
