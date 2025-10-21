@@ -190,6 +190,25 @@ const baseVideos: VideoDetail[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    id: 'sir_ken_robinson_do_schools_kill_creativity',
+    title: 'Do schools kill creativity?',
+    speaker: 'Sir Ken Robinson',
+    thumbnailUrl:
+      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/01b0b405-c448-4b24-a9dc-7ad0dbff25dc/SirKenRobinson_2006-embed.jpg?w=800',
+    duration: '19:24',
+    tags: ['Education', 'Creativity'],
+    shortDescription: '켄 로빈슨 경이 교육 시스템이 창의성을 억누르는 방식과 그 대안을 제시합니다.',
+    source: buildTedSource('sir_ken_robinson_do_schools_kill_creativity'),
+    publishedAt: '2006-02-01T00:00:00Z',
+    learningObjectives: [
+      '교육 현장에서 창의성을 지키는 전략 살펴보기',
+      '실패와 학습의 관계에 대한 관점 이해하기',
+      '다양한 재능을 존중하는 수업 설계 방안 고민하기',
+    ],
+    transcript: [
       {
         start: 60,
         end: 120,
