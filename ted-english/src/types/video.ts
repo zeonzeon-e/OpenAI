@@ -33,6 +33,14 @@ export interface VideoSource {
   providerName: string;
 }
 
+export interface VideoSource {
+  type: 'youtube' | 'ted' | 'external';
+  id: string;
+  embedUrl: string;
+  watchUrl: string;
+  providerName: string;
+}
+
 export interface VideoDetail extends VideoSummary {
   source: VideoSource;
   publishedAt: string;
