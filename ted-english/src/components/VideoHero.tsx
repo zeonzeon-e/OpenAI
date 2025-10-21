@@ -1,4 +1,6 @@
 import { CalendarDaysIcon, ClockIcon, UsersIcon } from '@heroicons/react/24/outline';
+
+import { formatDuration } from '../utils/time';
 import { VideoDetail } from '../types/video';
 
 interface VideoHeroProps {
@@ -6,12 +8,7 @@ interface VideoHeroProps {
 }
 
 export const VideoHero = ({ video }: VideoHeroProps) => {
-  const formattedDate = video.publishedAt ? new Date(video.publishedAt).toLocaleDateString('ko-KR') : '발표일 미정';
-  const durationLabel = video.duration || '재생시간 미정';
-  const speakerLabel = video.speaker || 'TED Speaker';
-  const description = video.shortDescription || '이 강연의 상세 설명은 준비 중입니다.';
-  const { embedUrl, watchUrl, providerName } = video.source;
-  const hasEmbed = Boolean(embedUrl);
+  const formattedDuration = formatDuration(video.durationSeconds, video.duration);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950">
@@ -27,7 +24,7 @@ export const VideoHero = ({ video }: VideoHeroProps) => {
               <UsersIcon className="h-4 w-4 text-brand-200" /> {speakerLabel}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3 py-1">
-              <ClockIcon className="h-4 w-4 text-brand-200" /> {durationLabel}
+              <ClockIcon className="h-4 w-4 text-brand-200" /> {formattedDuration}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3 py-1">
               <CalendarDaysIcon className="h-4 w-4 text-brand-200" /> {formattedDate}

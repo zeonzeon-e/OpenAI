@@ -1121,13 +1121,15 @@ const useVideoLibrary = () => {
   return remoteVideos;
 };
 
+const sortedVideos = [...videos].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+
 export const useAllVideos = () => {
-  return useVideoLibrary();
+  return useMemo(() => sortedVideos, []);
 };
 
 export const useVideoById = (): VideoDetail | undefined => {
   const { videoId } = useParams();
   const allVideos = useVideoLibrary();
 
-  return useMemo(() => allVideos.find((video) => video.id === videoId), [allVideos, videoId]);
+  return useMemo(() => sortedVideos.find((video) => video.id === videoId), [videoId]);
 };

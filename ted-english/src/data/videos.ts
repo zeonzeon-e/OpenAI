@@ -1,242 +1,95 @@
 import { TranscriptSegment, VideoDetail } from '../types/video';
 
-const buildTedSource = (slug: string) => ({
-  type: 'ted' as const,
-  id: slug,
-  embedUrl: `https://embed.ted.com/talks/${slug}`,
-  watchUrl: `https://www.ted.com/talks/${slug}`,
-  providerName: 'TED',
-});
-
-const buildYoutubeSource = (youtubeId: string) => ({
-  type: 'youtube' as const,
-  id: youtubeId,
-  embedUrl: `https://www.youtube.com/embed/${youtubeId}`,
-  watchUrl: `https://www.youtube.com/watch?v=${youtubeId}`,
-  providerName: 'YouTube',
-});
-
-const extractKeywords = (text: string) => {
-  const matches = text.toLowerCase().match(/[a-z]{5,}/g) ?? [];
-  const unique = Array.from(new Set(matches));
-
-  return unique.slice(0, 3).map((term) => ({
-    term,
-    definition: `${term}의 의미를 사전에서 확인하고 영어 예문을 만들어 보세요.`,
-  }));
-};
-
-const buildPlaceholderTranscript = (title: string, englishSummary: string): TranscriptSegment[] => {
-  const vocabulary = extractKeywords(englishSummary);
-
-  return [
-    {
-      start: 0,
-      end: 45,
-      english: englishSummary,
-      korean: `${title} 강연의 핵심 내용을 한국어로 정리해 보세요.`,
-      grammarNotes: ['주요 동사와 시제를 파악해 보세요.'],
-      vocabulary,
-    },
-    {
-      start: 45,
-      end: 90,
-      english: 'Think about how this message relates to your own life and explain it in English.',
-      korean: '이 메시지가 자신의 삶과 어떻게 연결되는지 영어로 설명해 보세요.',
-      grammarNotes: ['명령문과 to 부정사의 쓰임을 살펴보세요.'],
-      vocabulary: [
-        {
-          term: 'relate',
-          definition: 'relate의 의미를 확인하고 활용 예문을 만들어 보세요.',
-        },
-        {
-          term: 'describe',
-          definition: 'describe의 쓰임을 연습해 보세요.',
-        },
-      ],
-    },
-  ];
-};
-
-const buildPlaceholderObjectives = (title: string): string[] => [
-  `${title}에서 전달하는 핵심 메시지를 이해하기`,
-  '강연에서 배운 표현과 어휘를 정리하기',
-  '주제를 자신의 경험과 연결해 영어로 말하기',
-];
-
-const buildSpeakerSummary = (speaker: string, title: string, description: string) => {
-  const trimmedSpeaker = speaker.trim();
-  const trimmedDescription = description.replace(/\s+/g, ' ').trim();
-
-  if (trimmedSpeaker && trimmedDescription) {
-    return `${trimmedSpeaker}의 TED 강연자로, ${trimmedDescription}`;
-  }
-
-  if (trimmedSpeaker) {
-    return `${trimmedSpeaker}의 TED 강연자 소개는 준비 중입니다.`;
-  }
-
-  if (trimmedDescription) {
-    return `${title} 강연자는 ${trimmedDescription}`;
-  }
-
-  return `${title} 강연자의 소개는 준비 중입니다.`;
-};
-
-type PlaceholderVideoSeed = {
+type VideoMeta = {
   id: string;
   title: string;
   speaker: string;
+  topic: string;
   youtubeId: string;
+  durationSeconds: number;
+  publishedAt: string;
   tags: string[];
   shortDescription: string;
-  englishSummary: string;
-  publishedAt: string;
-  duration?: string;
+  speakerBio: string;
 };
 
-const createFallbackVideo = (seed: PlaceholderVideoSeed): VideoDetail => {
-  const source = buildYoutubeSource(seed.youtubeId);
-
-  return {
-    id: seed.id,
-    title: seed.title,
-    speaker: seed.speaker,
-    thumbnailUrl: `https://img.youtube.com/vi/${seed.youtubeId}/hqdefault.jpg`,
-    duration: seed.duration ?? '재생시간 미정',
-    tags: seed.tags,
-    shortDescription: seed.shortDescription,
-    speakerSummary: buildSpeakerSummary(seed.speaker, seed.title, seed.shortDescription),
-    source,
-    publishedAt: seed.publishedAt,
-    learningObjectives: buildPlaceholderObjectives(seed.title),
-    transcript: buildPlaceholderTranscript(seed.title, seed.englishSummary),
-  };
+const formatDuration = (seconds: number) => {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60)
+    .toString()
+    .padStart(hrs > 0 ? 2 : 1, '0');
+  const secs = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0');
+  return hrs > 0 ? `${hrs}:${mins}:${secs}` : `${mins}:${secs}`;
 };
 
-const baseVideos: VideoDetail[] = [
+const sharedGrammarNotes = [
+  '현재형 동사로 일반적인 사실을 설명하는 문장을 확인해 보세요.',
+  '동명사(-ing)를 사용하여 행동이나 개념을 명사처럼 표현하고 있습니다.',
+];
+
+const createTranscript = (meta: VideoMeta): TranscriptSegment[] => [
   {
-    id: 'amy_cuddy_your_body_language_shapes_who_you_are',
-    title: 'Your body language may shape who you are',
-    speaker: 'Amy Cuddy',
-    thumbnailUrl:
-      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/f6f0426a-f489-4a2d-842c-4ffb0f0ec81b/AmyCuddy_2012-embed.jpg?w=800',
-    duration: '21:03',
-    tags: ['Confidence', 'Body language'],
-    shortDescription:
-      '사회심리학자 에이미 커디가 자세와 몸짓이 우리의 감정과 성공에 어떤 영향을 미치는지 설명합니다.',
-    source: buildTedSource('amy_cuddy_your_body_language_shapes_who_you_are'),
-    publishedAt: '2012-06-01T00:00:00Z',
-    learningObjectives: [
-      '파워 포즈가 자기 인식에 미치는 영향 이해하기',
-      '비언어적 신호가 타인에게 주는 인상을 분석하기',
-      '자신감을 키우기 위한 실천적 전략 정리하기',
-    ],
-    transcript: [
+    start: 0,
+    end: 75,
+    english: `${meta.speaker} opens the talk by describing how ${meta.topic} shapes everyday decisions and emotions.`,
+    korean: `${meta.speaker}는 ${meta.topic}이 우리의 일상적인 선택과 감정을 어떻게 바꾸는지 설명하며 강연을 시작합니다.`,
+    grammarNotes: sharedGrammarNotes,
+    vocabulary: [
       {
-        start: 0,
-        end: 45,
-        english:
-          "So I want to start by offering you a free no-tech life hack, and all it requires of you is this: that you change your posture for two minutes.",
-        korean:
-          '간단한 자세 변화만으로 삶을 바꿀 수 있는 무료 팁을 소개합니다. 단 2분간 자세를 바꾸기만 하면 됩니다.',
-        grammarNotes: ['명령문 형태에서 동사 원형 사용을 확인하세요.'],
-        vocabulary: [
-          {
-            term: 'posture',
-            definition: '몸의 자세, 포즈',
-            example: 'Maintain a confident posture before your presentation.',
-          },
-        ],
+        term: 'reframe',
+        definition: `${meta.topic}을 새로운 시각으로 바라보다`,
+        partOfSpeech: 'verb',
+        example: `${meta.speaker} encourages the audience to reframe ${meta.topic} with curiosity.`,
       },
       {
-        start: 45,
-        end: 90,
-        english: 'Power posing actually feels good, and it improves your performance.',
-        korean: '파워 포즈는 기분을 좋게 하고 성과 향상에도 도움이 됩니다.',
-        grammarNotes: ['현재형 서술문에서 주어와 동사의 일치를 확인하세요.'],
-        vocabulary: [
-          {
-            term: 'performance',
-            definition: '성과, 수행 능력',
-            example: 'Her performance improved after regular practice.',
-          },
-        ],
-      },
-      {
-        start: 90,
-        end: 150,
-        english: 'Tiny tweaks can lead to big changes.',
-        korean: '작은 조정이 큰 변화를 가져올 수 있습니다.',
-        grammarNotes: ['조동사 can의 사용을 확인하고 가능성을 표현하는 방법을 익히세요.'],
-        vocabulary: [
-          {
-            term: 'tweak',
-            definition: '작은 수정, 약간의 조정',
-            example: 'Make a few tweaks to your study plan each week.',
-          },
-        ],
+        term: 'perspective',
+        definition: '관점, 시각',
+        partOfSpeech: 'noun',
+        example: `Changing your perspective can transform how you handle ${meta.topic}.`,
       },
     ],
   },
   {
-    id: 'sir_ken_robinson_do_schools_kill_creativity',
-    title: 'Do schools kill creativity?',
-    speaker: 'Sir Ken Robinson',
-    thumbnailUrl:
-      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/01b0b405-c448-4b24-a9dc-7ad0dbff25dc/SirKenRobinson_2006-embed.jpg?w=800',
-    duration: '19:24',
-    tags: ['Education', 'Creativity'],
-    shortDescription: '켄 로빈슨 경이 교육 시스템이 창의성을 억누르는 방식과 그 대안을 제시합니다.',
-    source: buildTedSource('sir_ken_robinson_do_schools_kill_creativity'),
-    publishedAt: '2006-02-01T00:00:00Z',
-    learningObjectives: [
-      '교육 현장에서 창의성을 지키는 전략 살펴보기',
-      '실패와 학습의 관계에 대한 관점 이해하기',
-      '다양한 재능을 존중하는 수업 설계 방안 고민하기',
+    start: 75,
+    end: 150,
+    english: `Through a memorable story, the talk illustrates what ${meta.topic} looks like when people experiment with new habits.`,
+    korean: `인상적인 사례를 통해 사람들이 새로운 습관을 시도할 때 ${meta.topic}이 어떻게 나타나는지 보여줍니다.`,
+    grammarNotes: [
+      '과거시제를 사용해 실제 경험을 회상하며 이야기를 전개합니다.',
+      '관계대명사 that을 사용하여 앞선 명사를 자세히 설명합니다.',
     ],
-    transcript: [
+    vocabulary: [
       {
-        start: 0,
-        end: 60,
-        english: 'What I find is everybody has an interest in education literally everybody.',
-        korean: '모든 사람이 교육에 관심이 있다는 사실을 발견했습니다.',
-        grammarNotes: ['현재형 일반동사의 활용을 확인하세요.'],
-        vocabulary: [
-          {
-            term: 'literally',
-            definition: '말 그대로, 정말로',
-            example: 'Literally everyone showed up to the meeting.',
-          },
-        ],
+        term: 'experiment',
+        definition: `${meta.topic}을 시도하다, 실험하다`,
+        partOfSpeech: 'verb',
+        example: `She asked the team to experiment with a fresh approach to ${meta.topic}.`,
       },
       {
-        start: 60,
-        end: 120,
-        english: 'If you are not prepared to be wrong, you will never come up with anything original.',
-        korean: '틀릴 준비가 되어 있지 않다면, 결코 독창적인 것을 만들어낼 수 없습니다.',
-        grammarNotes: ['조건문 if 절과 본문의 시제 일치를 확인하세요.'],
-        vocabulary: [
-          {
-            term: 'original',
-            definition: '독창적인, 원래의',
-            example: 'She had an original idea for the science project.',
-          },
-        ],
+        term: 'illustrate',
+        definition: '예시를 통해 설명하다',
+        partOfSpeech: 'verb',
+        example: `The story illustrates why ${meta.topic} matters in real life.`,
       },
+    ],
+  },
+  {
+    start: 150,
+    end: 240,
+    english: `In closing, ${meta.speaker} invites the audience to apply the insights on ${meta.topic} to their own communities and routines.`,
+    korean: `마지막으로 ${meta.speaker}는 ${meta.topic}에 대한 통찰을 각자의 공동체와 일상에 적용해 보라고 제안합니다.`,
+    grammarNotes: [
+      '부사구 in closing으로 결말 부분임을 알립니다.',
+      'to 부정사를 사용해 실천해야 할 행동을 제시합니다.',
+    ],
+    vocabulary: [
       {
-        start: 120,
-        end: 180,
-        english: 'We stigmatize mistakes, and we are now running national education systems where mistakes are the worst thing you can make.',
-        korean: '우리는 실수를 낙인찍고, 실수가 최악이라고 여기는 교육 시스템을 운영하고 있습니다.',
-        grammarNotes: ['현재진행형과 관계대명사 where의 쓰임을 살펴보세요.'],
-        vocabulary: [
-          {
-            term: 'stigmatize',
-            definition: '오명을 씌우다, 낙인찍다',
-            example: 'Do not stigmatize learners for asking questions.',
-          },
-        ],
+        term: 'insight',
+        definition: `${meta.topic}에 대한 통찰`,
+        partOfSpeech: 'noun',
+        example: `Each insight on ${meta.topic} becomes a small invitation to act.`,
       },
     ],
   },
@@ -258,353 +111,626 @@ const baseVideos: VideoDetail[] = [
     ],
     transcript: [
       {
-        start: 0,
-        end: 60,
-        english: 'I am a storyteller and I would like to tell you a few personal stories about what I like to call the danger of the single story.',
-        korean: '저는 이야기꾼입니다. 단일한 이야기의 위험성에 대한 개인적인 이야기를 들려드리고자 합니다.',
-        grammarNotes: ['I would like to 의 공손한 표현을 확인하세요.'],
-        vocabulary: [
-          {
-            term: 'storyteller',
-            definition: '이야기꾼, 이야기하는 사람',
-            example: 'Become a storyteller who shares multiple perspectives.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'chimamanda_adichie_the_danger_of_a_single_story',
-    title: 'The danger of a single story',
-    speaker: 'Chimamanda Ngozi Adichie',
-    thumbnailUrl:
-      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/22c612e4-3925-43a7-9813-0ce8bf1f6382/ChimamandaAdichie_2009G-embed.jpg?w=800',
-    duration: '18:48',
-    tags: ['Storytelling', 'Culture'],
-    shortDescription: '치마만다 응고지 아디치에가 단일한 이야기의 위험성과 다양성의 중요성을 이야기합니다.',
-    source: buildTedSource('chimamanda_adichie_the_danger_of_a_single_story'),
-    publishedAt: '2009-07-01T00:00:00Z',
-    learningObjectives: [
-      '단일한 이야기가 편견을 만드는 방식 이해하기',
-      '다양한 관점을 수용하는 언어 표현 배우기',
-      '문화적 배경을 설명하는 어휘 확장하기',
-    ],
-    transcript: [
-      {
-        start: 60,
-        end: 120,
-        english: 'Show a people as one thing, as only one thing, over and over again, and that is what they become.',
-        korean: '사람들을 단 하나의 모습으로 반복해서 보여주면, 결국 그 모습으로 굳어집니다.',
-        grammarNotes: ['명령문의 구조와 and that is what ... 구문을 분석해 보세요.'],
-        vocabulary: [
-          {
-            term: 'over and over',
-            definition: '반복해서, 계속해서',
-            example: 'Practice the vocabulary over and over until it sticks.',
-          },
-        ],
-      },
-      {
-        start: 120,
-        end: 180,
-        english: 'The consequence of the single story is this: It robs people of dignity.',
-        korean: '단일한 이야기가 가져오는 결과는 사람들의 존엄성을 빼앗는 것입니다.',
-        grammarNotes: ['동격 the consequence ... is this 구문을 확인하세요.'],
-        vocabulary: [
-          {
-            term: 'dignity',
-            definition: '존엄, 품위',
-            example: 'Every person deserves to live with dignity.',
-          },
-        ],
+        term: 'apply',
+        definition: '적용하다',
+        partOfSpeech: 'verb',
+        example: `Try to apply these lessons on ${meta.topic} this week.`,
       },
     ],
   },
 ];
 
-const fallbackVideoSeeds: PlaceholderVideoSeed[] = [
-  {
-    id: 'simon_sinek_how_great_leaders_inspire_action',
-    title: 'How great leaders inspire action',
-    speaker: 'Simon Sinek',
-    youtubeId: 'qp0HIF3SfI4',
-    tags: ['Leadership', 'Motivation'],
-    shortDescription: '사이먼 시넥이 리더들이 왜에서 시작해야 하는지 설명합니다.',
-    englishSummary: 'Simon Sinek explains how inspirational leaders start by communicating a clear sense of why.',
-    publishedAt: '2009-09-17T00:00:00Z',
-  },
-  {
-    id: 'brene_brown_the_power_of_vulnerability',
-    title: 'The power of vulnerability',
-    speaker: 'Brené Brown',
-    youtubeId: 'iCvmsMzlF7o',
-    tags: ['Courage', 'Connection'],
-    shortDescription: '브레네 브라운이 취약함을 받아들이는 힘에 대해 이야기합니다.',
-    englishSummary: 'Brené Brown shows how embracing vulnerability creates real courage and connection.',
-    publishedAt: '2010-06-22T00:00:00Z',
-  },
-  {
-    id: 'jill_bolte_taylor_my_stroke_of_insight',
-    title: 'My stroke of insight',
-    speaker: 'Jill Bolte Taylor',
-    youtubeId: 'UyyjU8fzEYU',
-    tags: ['Brain', 'Recovery'],
-    shortDescription: '질 볼티 테일러가 뇌졸중 경험에서 얻은 통찰을 공유합니다.',
-    englishSummary: 'Jill Bolte Taylor recounts her stroke and the profound insight it gave her about the brain.',
-    publishedAt: '2008-05-01T00:00:00Z',
-  },
-  {
-    id: 'dan_pink_the_puzzle_of_motivation',
-    title: 'The puzzle of motivation',
-    speaker: 'Dan Pink',
-    youtubeId: 'rrkrvAUbU9Y',
-    tags: ['Work', 'Psychology'],
-    shortDescription: '댄 핑크가 동기 부여의 비밀과 보상의 한계를 설명합니다.',
-    englishSummary: 'Dan Pink explores why traditional rewards often fail and what truly motivates us.',
-    publishedAt: '2009-07-01T00:00:00Z',
-  },
-  {
-    id: 'shawn_achor_the_happy_secret_to_better_work',
-    title: 'The happy secret to better work',
-    speaker: 'Shawn Achor',
-    youtubeId: 'fLJsdqxnZb0',
-    tags: ['Happiness', 'Productivity'],
-    shortDescription: '숀 에이코가 긍정심리가 업무 성과를 높이는 방법을 소개합니다.',
-    englishSummary: 'Shawn Achor explains how a happier mindset can unlock better performance at work.',
-    publishedAt: '2011-05-01T00:00:00Z',
-  },
-  {
-    id: 'susan_cain_the_power_of_introverts',
-    title: 'The power of introverts',
-    speaker: 'Susan Cain',
-    youtubeId: 'c0KYU2j0TM4',
-    tags: ['Personality', 'Culture'],
-    shortDescription: '수전 케인이 내향형의 강점을 조명합니다.',
-    englishSummary: 'Susan Cain celebrates the quiet strengths that introverts bring to the world.',
-    publishedAt: '2012-03-01T00:00:00Z',
-  },
-  {
-    id: 'julian_treasure_how_to_speak_so_that_people_want_to_listen',
-    title: 'How to speak so that people want to listen',
-    speaker: 'Julian Treasure',
-    youtubeId: 'eIho2S0ZahI',
-    tags: ['Communication', 'Voice'],
-    shortDescription: '줄리언 트레저가 사람들의 귀를 여는 말하기 기술을 소개합니다.',
-    englishSummary: 'Julian Treasure shares vocal tools that help us speak so others truly want to listen.',
-    publishedAt: '2014-06-27T00:00:00Z',
-  },
-  {
-    id: 'angela_duckworth_grit_the_power_of_passion_and_perseverance',
-    title: 'Grit: the power of passion and perseverance',
-    speaker: 'Angela Lee Duckworth',
-    youtubeId: 'H14bBuluwB8',
-    tags: ['Education', 'Success'],
-    shortDescription: '앤절라 더크워스가 끈기가 성공을 이끄는 힘이라고 말합니다.',
-    englishSummary: 'Angela Lee Duckworth reveals how grit and perseverance drive long-term achievement.',
-    publishedAt: '2013-05-09T00:00:00Z',
-  },
-  {
-    id: 'mary_roach_10_things_you_didnt_know_about_orgasm',
-    title: "10 things you didn't know about orgasm",
-    speaker: 'Mary Roach',
-    youtubeId: 'lg3tmlxVFt4',
-    tags: ['Science', 'Humor'],
-    shortDescription: '메리 로치가 과학적 사실로 오르가즘을 유쾌하게 풀어냅니다.',
-    englishSummary: "Mary Roach delivers surprising science about orgasm with wit and clarity.",
-    publishedAt: '2009-02-01T00:00:00Z',
-  },
-  {
-    id: 'elizabeth_gilbert_your_elusive_creative_genius',
-    title: 'Your elusive creative genius',
-    speaker: 'Elizabeth Gilbert',
-    youtubeId: '86x-u-tz0MA',
-    tags: ['Creativity', 'Writing'],
-    shortDescription: '엘리자베스 길버트가 창의성을 대하는 새로운 관점을 제시합니다.',
-    englishSummary: 'Elizabeth Gilbert reimagines how we think about creative genius and fear.',
-    publishedAt: '2009-02-05T00:00:00Z',
-  },
-  {
-    id: 'tony_robbins_why_we_do_what_we_do',
-    title: 'Why we do what we do',
-    speaker: 'Tony Robbins',
-    youtubeId: 'Cpc-t-Uwv1I',
-    tags: ['Behavior', 'Motivation'],
-    shortDescription: '토니 로빈스가 인간 행동을 이끄는 여섯 가지 욕구를 설명합니다.',
-    englishSummary: 'Tony Robbins discusses the invisible forces that shape our actions every day.',
-    publishedAt: '2006-02-01T00:00:00Z',
-  },
-  {
-    id: 'pico_iyer_the_art_of_stillness',
-    title: 'The art of stillness',
-    speaker: 'Pico Iyer',
-    youtubeId: '8Kswyq_8iPk',
-    tags: ['Mindfulness', 'Travel'],
-    shortDescription: '피코 아이어가 멈춤과 고요가 주는 선물을 이야기합니다.',
-    englishSummary: 'Pico Iyer reflects on how moments of stillness can transform busy lives.',
-    publishedAt: '2014-11-13T00:00:00Z',
-  },
-  {
-    id: 'bill_gross_the_single_biggest_reason_why_startups_succeed',
-    title: 'The single biggest reason why startups succeed',
-    speaker: 'Bill Gross',
-    youtubeId: 'bNpx7gpSqbY',
-    tags: ['Startups', 'Strategy'],
-    shortDescription: '빌 그로스가 스타트업 성공을 좌우하는 결정적 요인을 분석합니다.',
-    englishSummary: 'Bill Gross breaks down data to reveal the top factor behind startup success.',
-    publishedAt: '2015-03-01T00:00:00Z',
-  },
-  {
-    id: 'tim_urban_inside_the_mind_of_a_master_procrastinator',
-    title: 'Inside the mind of a master procrastinator',
-    speaker: 'Tim Urban',
-    youtubeId: 'arj7oStGLkU',
-    tags: ['Productivity', 'Humor'],
-    shortDescription: '팀 어반이 미루기의 심리를 유쾌하게 풀어냅니다.',
-    englishSummary: 'Tim Urban humorously explores what happens inside the mind of a procrastinator.',
-    publishedAt: '2016-02-01T00:00:00Z',
-  },
-  {
-    id: 'dan_gilbert_the_surprising_science_of_happiness',
-    title: 'The surprising science of happiness',
-    speaker: 'Dan Gilbert',
-    youtubeId: '4q1dgn_C0AU',
-    tags: ['Happiness', 'Psychology'],
-    shortDescription: '댄 길버트가 행복에 대한 놀라운 과학적 사실을 설명합니다.',
-    englishSummary: 'Dan Gilbert shares the science that explains why we can synthesize happiness.',
-    publishedAt: '2004-02-01T00:00:00Z',
-  },
-  {
-    id: 'hans_rosling_the_best_stats_you_ve_ever_seen',
-    title: "The best stats you've ever seen",
-    speaker: 'Hans Rosling',
-    youtubeId: 'usdJgEwMinM',
-    tags: ['Data', 'Global development'],
-    shortDescription: '한스 로슬링이 데이터로 세계를 보는 새로운 시각을 제시합니다.',
-    englishSummary: "Hans Rosling brings global statistics to life with dynamic storytelling.",
-    publishedAt: '2006-02-01T00:00:00Z',
-  },
-  {
-    id: 'robert_waldinger_what_makes_a_good_life',
-    title: 'What makes a good life? Lessons from the longest study on happiness',
-    speaker: 'Robert Waldinger',
-    youtubeId: '8KkKuTCFvzI',
-    tags: ['Well-being', 'Relationships'],
-    shortDescription: '로버트 월딩어가 행복 연구에서 얻은 삶의 교훈을 공유합니다.',
-    englishSummary: 'Robert Waldinger reveals lessons on happiness from a decades-long study.',
-    publishedAt: '2015-11-01T00:00:00Z',
-  },
-  {
-    id: 'sarah_kay_if_i_should_have_a_daughter',
-    title: 'If I should have a daughter ...',
-    speaker: 'Sarah Kay',
-    youtubeId: '0snNB1yS3IE',
-    tags: ['Spoken word', 'Creativity'],
-    shortDescription: '사라 케이가 시와 이야기로 성장과 공감을 노래합니다.',
-    englishSummary: 'Sarah Kay performs spoken word poetry about love, growth, and imagination.',
-    publishedAt: '2011-03-01T00:00:00Z',
-  },
-  {
-    id: 'brene_brown_listening_to_shame',
-    title: 'Listening to shame',
-    speaker: 'Brené Brown',
-    youtubeId: 'psN1DORYYV0',
-    tags: ['Courage', 'Empathy'],
-    shortDescription: '브레네 브라운이 수치심을 이해하고 극복하는 방법을 제안합니다.',
-    englishSummary: 'Brené Brown encourages us to confront shame and build wholehearted lives.',
-    publishedAt: '2012-03-01T00:00:00Z',
-  },
-  {
-    id: 'kelly_mcgonigal_how_to_make_stress_your_friend',
-    title: 'How to make stress your friend',
-    speaker: 'Kelly McGonigal',
-    youtubeId: 'RcGyVTAoXEU',
-    tags: ['Health', 'Mindset'],
-    shortDescription: '켈리 맥고니걸이 스트레스를 친구로 만드는 새로운 관점을 소개합니다.',
-    englishSummary: 'Kelly McGonigal reframes stress as a response that can strengthen us.',
-    publishedAt: '2013-06-01T00:00:00Z',
-  },
-  {
-    id: 'nigel_marsh_how_to_make_work_life_balance_work',
-    title: 'How to make work-life balance work',
-    speaker: 'Nigel Marsh',
-    youtubeId: 'jdpIKXLLYYM',
-    tags: ['Work', 'Balance'],
-    shortDescription: '나이젤 마시가 현실적인 워라밸 전략을 공유합니다.',
-    englishSummary: 'Nigel Marsh shares practical steps for designing a sustainable work-life balance.',
-    publishedAt: '2010-05-01T00:00:00Z',
-  },
-  {
-    id: 'monica_lewinsky_the_price_of_shame',
-    title: 'The price of shame',
-    speaker: 'Monica Lewinsky',
-    youtubeId: 'FQ0-0jeA_mg',
-    tags: ['Cyberbullying', 'Empathy'],
-    shortDescription: '모니카 르윈스키가 온라인 괴롭힘의 대가와 공감의 중요성을 이야기합니다.',
-    englishSummary: 'Monica Lewinsky discusses the cost of shame culture and why empathy matters.',
-    publishedAt: '2015-03-01T00:00:00Z',
-  },
-  {
-    id: 'jamie_oliver_teach_every_child_about_food',
-    title: 'Teach every child about food',
-    speaker: 'Jamie Oliver',
-    youtubeId: 'go_QOzc79Uc',
-    tags: ['Health', 'Education'],
-    shortDescription: '제이미 올리버가 모든 아이들에게 음식 교육이 필요하다고 강조합니다.',
-    englishSummary: 'Jamie Oliver calls for better food education to fight diet-related disease.',
-    publishedAt: '2010-02-01T00:00:00Z',
-  },
-  {
-    id: 'pamela_meyer_how_to_spot_a_liar',
-    title: 'How to spot a liar',
-    speaker: 'Pamela Meyer',
-    youtubeId: 'P_6vDLq64gE',
-    tags: ['Communication', 'Psychology'],
-    shortDescription: '파멜라 마이어가 거짓말을 구분하는 단서를 공유합니다.',
-    englishSummary: 'Pamela Meyer uncovers patterns that reveal when someone might be lying.',
-    publishedAt: '2011-07-15T00:00:00Z',
-  },
-  {
-    id: 'rita_pierson_every_kid_needs_a_champion',
-    title: 'Every kid needs a champion',
-    speaker: 'Rita Pierson',
-    youtubeId: 'SFnMTHhKdkw',
-    tags: ['Education', 'Inspiration'],
-    shortDescription: '리타 피어슨이 학생 한 명 한 명에게 필요한 응원을 말합니다.',
-    englishSummary: 'Rita Pierson reminds teachers that relationships transform student learning.',
-    publishedAt: '2013-05-01T00:00:00Z',
-  },
-  {
-    id: 'lera_boroditsky_how_language_shapes_the_way_we_think',
-    title: 'How language shapes the way we think',
-    speaker: 'Lera Boroditsky',
-    youtubeId: 'RKK7wGAYP6k',
-    tags: ['Language', 'Culture'],
-    shortDescription: '레라 보로디츠키가 언어가 사고방식을 어떻게 바꾸는지 설명합니다.',
-    englishSummary: 'Lera Boroditsky explores how language influences the way we understand the world.',
-    publishedAt: '2017-11-01T00:00:00Z',
-  },
-  {
-    id: 'ernesto_sirolli_want_to_help_someone_shut_up_and_listen',
-    title: 'Want to help someone? Shut up and listen!',
-    speaker: 'Ernesto Sirolli',
-    youtubeId: 'chXsLtHqfdM',
-    tags: ['Development', 'Entrepreneurship'],
-    shortDescription: '에르네스토 시롤리가 진짜 도움을 주는 경청의 기술을 말합니다.',
-    englishSummary: 'Ernesto Sirolli urges would-be helpers to listen deeply before taking action.',
-    publishedAt: '2012-06-01T00:00:00Z',
-  },
+const createObjectives = (meta: VideoMeta): string[] => [
+  `${meta.topic}의 핵심 개념을 이해하고 일상에 연결하기`,
+  `${meta.speaker}의 사례를 통해 ${meta.topic}을 실천하는 방법 살펴보기`,
+  `개인 학습 또는 수업에서 ${meta.topic}을 활용할 수 있는 표현 익히기`,
 ];
 
-const generatedFallbackVideos = fallbackVideoSeeds.map(createFallbackVideo);
-
-const withSpeakerSummary = (video: VideoDetail): VideoDetail => ({
-  ...video,
-  speakerSummary: video.speakerSummary ?? buildSpeakerSummary(video.speaker, video.title, video.shortDescription),
+const createVideo = (meta: VideoMeta): VideoDetail => ({
+  id: meta.id,
+  title: meta.title,
+  speaker: meta.speaker,
+  thumbnailUrl: `https://img.youtube.com/vi/${meta.youtubeId}/hqdefault.jpg`,
+  duration: formatDuration(meta.durationSeconds),
+  durationSeconds: meta.durationSeconds,
+  tags: meta.tags,
+  shortDescription: meta.shortDescription,
+  youtubeId: meta.youtubeId,
+  publishedAt: meta.publishedAt,
+  learningObjectives: createObjectives(meta),
+  transcript: createTranscript(meta),
+  speakerBio: meta.speakerBio,
 });
 
-export const videos: VideoDetail[] = [...baseVideos, ...generatedFallbackVideos].map(withSpeakerSummary);
+const videoMetas: VideoMeta[] = [
+  {
+    id: 'how-to-make-stress-your-friend',
+    title: 'How to Make Stress Your Friend',
+    speaker: 'Kelly McGonigal',
+    topic: '스트레스를 성장 기회로 전환하는 사고방식',
+    youtubeId: 'RcGyVTAoXEU',
+    durationSeconds: 868,
+    publishedAt: '2013-06-18',
+    tags: ['스트레스', '심리학', '회복탄력성'],
+    shortDescription:
+      '스트레스에 대한 관점을 바꾸면 신체 반응까지 긍정적으로 달라질 수 있다는 연구 결과를 공유합니다.',
+    speakerBio:
+      'Kelly McGonigal은 스탠퍼드 대학교 심리학자이자 건강 과학자로, 스트레스와 감정이 신체에 미치는 영향을 연구하며 대중에게 쉽고 실용적인 조언을 전하는 강연자로 잘 알려져 있습니다.',
+  },
+  {
+    id: 'inside-the-mind-of-a-master-procrastinator',
+    title: 'Inside the mind of a master procrastinator',
+    speaker: 'Tim Urban',
+    topic: '미루기 습관을 이해하고 관리하는 방법',
+    youtubeId: 'arj7oStGLkU',
+    durationSeconds: 842,
+    publishedAt: '2016-02-23',
+    tags: ['자기관리', '생산성', '유머'],
+    shortDescription:
+      '미루기의 뇌 구조를 유머러스하게 설명하며 마감이 없는 목표에도 동기를 부여하는 전략을 제시합니다.',
+    speakerBio:
+      'Tim Urban은 인기 블로그 Wait But Why의 공동 창립자로, 복잡한 주제를 재치 있는 일러스트와 이야기로 풀어내며 깊이 있는 통찰을 제공하는 작가이자 강연자입니다.',
+  },
+  {
+    id: 'the-power-of-vulnerability',
+    title: 'The power of vulnerability',
+    speaker: 'Brené Brown',
+    topic: '취약함을 인정하고 연결을 강화하는 용기',
+    youtubeId: 'iCvmsMzlF7o',
+    durationSeconds: 1222,
+    publishedAt: '2010-06-01',
+    tags: ['감정', '관계', '연결'],
+    shortDescription:
+      '취약함을 받아들이는 것이 진정한 용기와 공감의 출발점이라는 메시지를 전합니다.',
+    speakerBio:
+      'Brené Brown은 휴스턴 대학교 사회복지학 교수이자 베스트셀러 작가로, 취약성, 용기, 수치심에 관한 연구로 전 세계 독자와 청중에게 영감을 주고 있습니다.',
+  },
+  {
+    id: 'do-schools-kill-creativity',
+    title: 'Do schools kill creativity?',
+    speaker: 'Sir Ken Robinson',
+    topic: '교육에서 창의력을 살리는 방법',
+    youtubeId: 'iG9CE55wbtY',
+    durationSeconds: 1164,
+    publishedAt: '2006-02-01',
+    tags: ['교육', '창의성', '혁신'],
+    shortDescription:
+      '표준화된 교육이 창의성을 억누르는 문제를 지적하고 새로운 학습 환경을 제안합니다.',
+    speakerBio:
+      'Sir Ken Robinson은 영국의 교육자이자 정책 자문가로, 창의성과 혁신적인 교육 개혁을 촉진하기 위한 활동으로 국제적인 명성을 얻었습니다.',
+  },
+  {
+    id: 'your-body-language-shapes-who-you-are',
+    title: 'Your body language may shape who you are',
+    speaker: 'Amy Cuddy',
+    topic: '몸의 자세가 자신감과 인식에 미치는 영향',
+    youtubeId: 'Ks-_Mh1QhMc',
+    durationSeconds: 1266,
+    publishedAt: '2012-06-01',
+    tags: ['자신감', '비언어', '심리학'],
+    shortDescription:
+      '몸짓 언어가 생각보다 큰 힘을 가지고 있으며 자세를 바꾸는 것만으로도 자신감을 높일 수 있다고 이야기합니다.',
+    speakerBio:
+      'Amy Cuddy는 사회심리학자로, 하버드 경영대학원에서 사람들의 비언어적 표현이 인지와 행동에 미치는 영향을 연구했습니다.',
+  },
+  {
+    id: 'grit-the-power-of-passion-and-perseverance',
+    title: 'Grit: the power of passion and perseverance',
+    speaker: 'Angela Lee Duckworth',
+    topic: '끈기와 열정이 성취를 이끄는 방식',
+    youtubeId: 'H14bBuluwB8',
+    durationSeconds: 1076,
+    publishedAt: '2013-04-01',
+    tags: ['교육', '동기부여', '심리학'],
+    shortDescription:
+      '성공의 핵심 요소로 끈기를 제시하며 학생과 조직에서 어떻게 키울 수 있는지 설명합니다.',
+    speakerBio:
+      'Angela Lee Duckworth는 펜실베이니아 대학교 심리학 교수이자 연구자로, 끈기(grit)와 자기조절에 관한 연구로 유명합니다.',
+  },
+  {
+    id: 'the-happy-secret-to-better-work',
+    title: 'The happy secret to better work',
+    speaker: 'Shawn Achor',
+    topic: '행복이 생산성을 높이는 심리적 메커니즘',
+    youtubeId: 'GXy__kBVq1M',
+    durationSeconds: 750,
+    publishedAt: '2011-05-01',
+    tags: ['행복', '직장', '심리학'],
+    shortDescription:
+      '행복이 성공의 결과가 아니라 원인이라는 연구를 통해 일터에서 긍정성을 키우는 전략을 제시합니다.',
+    speakerBio:
+      'Shawn Achor는 긍정심리학 연구자이자 작가로, 하버드 대학교에서 행복과 성공의 상관관계를 연구하며 기업과 교육기관에 강연을 제공합니다.',
+  },
+  {
+    id: 'the-puzzle-of-motivation',
+    title: 'The puzzle of motivation',
+    speaker: 'Dan Pink',
+    topic: '자율성과 목적의식이 동기를 높이는 원리',
+    youtubeId: 'rrkrvAUbU9Y',
+    durationSeconds: 1110,
+    publishedAt: '2009-07-01',
+    tags: ['동기부여', '비즈니스', '행동경제학'],
+    shortDescription:
+      '외적 보상이 아닌 자율성, 숙련, 목적이 동기를 유발하는 핵심이라는 사실을 설명합니다.',
+    speakerBio:
+      'Dan Pink는 베스트셀러 작가이자 전 백악관 연설문 작성자로, 동기부여와 업무 혁신에 관한 연구와 강연으로 유명합니다.',
+  },
+  {
+    id: 'how-great-leaders-inspire-action',
+    title: 'How great leaders inspire action',
+    speaker: 'Simon Sinek',
+    topic: '리더가 목적을 통해 행동을 이끌어내는 법',
+    youtubeId: 'qp0HIF3SfI4',
+    durationSeconds: 1080,
+    publishedAt: '2009-09-01',
+    tags: ['리더십', '커뮤니케이션', '비즈니스'],
+    shortDescription:
+      '왜(Why)에서 출발하는 골든 서클 개념을 통해 사람들의 행동과 충성도를 이끌어내는 방법을 설명합니다.',
+    speakerBio:
+      'Simon Sinek은 조직 컨설턴트이자 작가로, 목적 중심 리더십과 사람들의 신념을 깨우는 커뮤니케이션 전략을 연구합니다.',
+  },
+  {
+    id: 'what-makes-a-good-life',
+    title: 'What makes a good life? Lessons from the longest study on happiness',
+    speaker: 'Robert Waldinger',
+    topic: '장기 연구에서 밝혀진 행복한 삶의 조건',
+    youtubeId: '8KkKuTCFvzI',
+    durationSeconds: 756,
+    publishedAt: '2015-11-01',
+    tags: ['행복', '인간관계', '심리학'],
+    shortDescription:
+      '75년간의 하버드 성인발달 연구를 통해 인간관계가 행복과 건강을 좌우한다는 사실을 공유합니다.',
+    speakerBio:
+      'Robert Waldinger는 하버드 의과대학 정신과 교수이자 승려로, 성인 발달과 행복에 관한 세계에서 가장 긴 연구를 이끌고 있습니다.',
+  },
+  {
+    id: 'the-danger-of-a-single-story',
+    title: 'The danger of a single story',
+    speaker: 'Chimamanda Ngozi Adichie',
+    topic: '편견을 넘기 위한 다층적 이야기의 힘',
+    youtubeId: 'D9Ihs241zeg',
+    durationSeconds: 1116,
+    publishedAt: '2009-07-01',
+    tags: ['문화', '정체성', '스토리텔링'],
+    shortDescription:
+      '단일한 관점이 사람과 문화를 왜곡하는 위험을 지적하며 다양한 이야기의 중요성을 강조합니다.',
+    speakerBio:
+      'Chimamanda Ngozi Adichie는 나이지리아 출신 소설가로, 여성주의와 정체성을 다룬 작품으로 세계적인 찬사를 받았습니다.',
+  },
+  {
+    id: 'ten-things-you-didnt-know-about-orgasm',
+    title: "10 things you didn't know about orgasm",
+    speaker: 'Mary Roach',
+    topic: '과학으로 살펴보는 인간의 성과 신체 반응',
+    youtubeId: 'ifEP3798ODs',
+    durationSeconds: 1020,
+    publishedAt: '2009-02-01',
+    tags: ['과학', '생물학', '호기심'],
+    shortDescription:
+      '유쾌한 과학적 탐구를 통해 오해와 진실을 짚으며 인간의 몸을 더 깊이 이해하도록 돕습니다.',
+    speakerBio:
+      'Mary Roach는 과학 저널리스트로, 인간의 신체와 특이한 과학 실험을 흥미롭게 풀어내는 저서로 유명합니다.',
+  },
+  {
+    id: 'how-to-speak-so-that-people-want-to-listen',
+    title: 'How to speak so that people want to listen',
+    speaker: 'Julian Treasure',
+    topic: '목소리와 전달력을 활용한 효과적인 말하기',
+    youtubeId: 'eIho2S0ZahI',
+    durationSeconds: 1080,
+    publishedAt: '2013-06-01',
+    tags: ['커뮤니케이션', '프레젠테이션', '기술'],
+    shortDescription:
+      '목소리의 다섯 가지 도구와 이야기 구조를 활용해 청중의 주의를 유지하는 방법을 소개합니다.',
+    speakerBio:
+      'Julian Treasure는 사운드 컨설턴트로, 소리 환경이 인간 행동에 미치는 영향을 연구하며 기업과 기관에 조언을 제공합니다.',
+  },
+  {
+    id: 'the-art-of-stillness',
+    title: 'The art of stillness',
+    speaker: 'Pico Iyer',
+    topic: '멈춤과 고요함이 가져오는 집중과 창조성',
+    youtubeId: 'byQrdnq7_H0',
+    durationSeconds: 840,
+    publishedAt: '2014-11-01',
+    tags: ['마음챙김', '창의성', '삶'],
+    shortDescription:
+      '끊임없이 움직이는 세상에서 잠시 멈출 때 얻을 수 있는 통찰과 평온을 나눕니다.',
+    speakerBio:
+      'Pico Iyer는 여행 작가이자 사상가로, 전 세계를 다니며 경험한 이야기를 통해 내면의 고요함과 삶의 균형을 이야기합니다.',
+  },
+  {
+    id: 'why-we-do-what-we-do',
+    title: 'Why we do what we do',
+    speaker: 'Tony Robbins',
+    topic: '인간 행동을 움직이는 감정과 믿음',
+    youtubeId: 'Cpc-t-Uwv1I',
+    durationSeconds: 1380,
+    publishedAt: '2006-02-01',
+    tags: ['심리학', '동기부여', '행동'],
+    shortDescription:
+      '감정과 의미 부여가 어떻게 행동을 결정하는지 설명하며 삶을 주도하는 선택을 강조합니다.',
+    speakerBio:
+      'Tony Robbins는 라이프 코치이자 베스트셀러 작가로, 심리학과 신경과학 기반 전략을 활용해 개인과 조직의 성장을 돕습니다.',
+  },
+  {
+    id: 'what-makes-us-feel-good-about-our-work',
+    title: 'What makes us feel good about our work?',
+    speaker: 'Dan Ariely',
+    topic: '의미와 노력이 업무 만족에 미치는 영향',
+    youtubeId: 'mPtHWW5n2uE',
+    durationSeconds: 1180,
+    publishedAt: '2012-02-01',
+    tags: ['행동경제학', '직장', '동기부여'],
+    shortDescription:
+      '작은 인정과 노력이 일의 의미를 크게 바꾼다는 실험 결과를 공유합니다.',
+    speakerBio:
+      'Dan Ariely는 듀크 대학교의 행동경제학자로, 인간이 비합리적으로 보이는 선택을 왜 하는지 연구합니다.',
+  },
+  {
+    id: 'the-power-of-introverts',
+    title: 'The power of introverts',
+    speaker: 'Susan Cain',
+    topic: '내향적인 사람의 강점과 잠재력',
+    youtubeId: 'c0KYU2j0TM4',
+    durationSeconds: 1086,
+    publishedAt: '2012-02-01',
+    tags: ['성격', '다양성', '리더십'],
+    shortDescription:
+      '내향적 성향을 존중하고 조직에서 잠재력을 발휘하도록 돕는 방법을 제안합니다.',
+    speakerBio:
+      'Susan Cain은 변호사 출신 작가로, 조용한 리더십과 내향적 성향의 가치를 강조하는 활동을 이어가고 있습니다.',
+  },
+  {
+    id: 'the-power-of-yet',
+    title: 'The power of yet',
+    speaker: 'Carol Dweck',
+    topic: '성장 마인드셋으로 학습 잠재력 확장하기',
+    youtubeId: 'J-swZaKN2Ic',
+    durationSeconds: 900,
+    publishedAt: '2014-09-01',
+    tags: ['교육', '성장마인드셋', '동기부여'],
+    shortDescription:
+      '아직(Not Yet)이라는 사고가 실패를 성장의 과정으로 바꾸는 힘을 설명합니다.',
+    speakerBio:
+      'Carol Dweck은 스탠퍼드 대학교 심리학자로, 고정 마인드셋과 성장 마인드셋 개념을 제시한 연구로 유명합니다.',
+  },
+  {
+    id: 'how-to-make-hard-choices',
+    title: 'How to make hard choices',
+    speaker: 'Ruth Chang',
+    topic: '중요한 선택을 다루는 철학적 접근',
+    youtubeId: '4D2pHZgx8F0',
+    durationSeconds: 930,
+    publishedAt: '2014-06-01',
+    tags: ['의사결정', '철학', '자기계발'],
+    shortDescription:
+      '정답이 없는 선택에서 스스로의 가치를 기준으로 결정을 내리는 방법을 제시합니다.',
+    speakerBio:
+      'Ruth Chang은 철학자이자 법학자로, 가치와 선택의 딜레마를 연구하며 개인의 주체적 결정을 옹호합니다.',
+  },
+  {
+    id: 'how-to-stop-screwing-yourself-over',
+    title: 'How to stop screwing yourself over',
+    speaker: 'Mel Robbins',
+    topic: '주저함을 끊고 행동을 촉발하는 전략',
+    youtubeId: 'Lp7E973zozc',
+    durationSeconds: 660,
+    publishedAt: '2011-09-01',
+    tags: ['자기계발', '행동', '심리학'],
+    shortDescription:
+      '5초의 용기가 삶을 바꾸는 행동으로 이어질 수 있음을 강조합니다.',
+    speakerBio:
+      'Mel Robbins는 방송인 겸 변호사 출신 강연자로, 간단한 행동 트리거를 통해 자기 변화를 이끄는 방법을 소개합니다.',
+  },
+  {
+    id: 'why-you-should-talk-to-strangers',
+    title: 'Why you should talk to strangers',
+    speaker: 'Kio Stark',
+    topic: '낯선 사람과의 대화가 만들어내는 연결',
+    youtubeId: 'W5VzvvV2R7Y',
+    durationSeconds: 840,
+    publishedAt: '2016-02-01',
+    tags: ['커뮤니케이션', '관계', '용기'],
+    shortDescription:
+      '낯선 사람과의 짧은 만남이 공감과 연대감을 키우는 방법을 소개합니다.',
+    speakerBio:
+      'Kio Stark는 작가이자 연구자로, 도시 공간과 인간 상호작용을 탐구하며 우연한 만남의 가치를 이야기합니다.',
+  },
+  {
+    id: 'the-beauty-of-being-a-misfit',
+    title: 'The beauty of being a misfit',
+    speaker: 'Lidia Yuknavitch',
+    topic: '다름을 수용하고 스스로의 목소리를 찾는 과정',
+    youtubeId: 'CpbKWA5G6Qk',
+    durationSeconds: 900,
+    publishedAt: '2016-06-01',
+    tags: ['정체성', '창의성', '회복탄력성'],
+    shortDescription:
+      '어디에도 속하지 못한다고 느낄 때 오히려 독창적인 목소리를 찾을 수 있다는 경험을 공유합니다.',
+    speakerBio:
+      'Lidia Yuknavitch는 소설가이자 강연자로, 비주류 경험과 예술적 표현을 통해 치유와 연결을 이야기합니다.',
+  },
+  {
+    id: 'the-skill-of-self-confidence',
+    title: 'The skill of self confidence',
+    speaker: 'Dr. Ivan Joseph',
+    topic: '자신감을 훈련하고 유지하는 기술',
+    youtubeId: 'w-HYZv6HzAs',
+    durationSeconds: 810,
+    publishedAt: '2012-11-01',
+    tags: ['자신감', '교육', '코칭'],
+    shortDescription:
+      '자신감은 타고나는 것이 아니라 연습으로 키울 수 있는 기술임을 사례로 설명합니다.',
+    speakerBio:
+      'Ivan Joseph 박사는 스포츠 심리학자이자 코치로, 팀과 개인이 자신감을 구축하는 방법을 연구하고 지도합니다.',
+  },
+  {
+    id: 'meet-yourself-a-users-guide-to-building-self-worth',
+    title: "Meet yourself: a user's guide to building self worth",
+    speaker: 'Niko Everett',
+    topic: '자기 가치감을 인식하고 성장시키는 방법',
+    youtubeId: '4weW3H_z-7w',
+    durationSeconds: 720,
+    publishedAt: '2013-11-01',
+    tags: ['자존감', '심리학', '자기계발'],
+    shortDescription:
+      '내면의 목소리를 재편하고 자기 가치를 인정하는 실천 전략을 소개합니다.',
+    speakerBio:
+      'Niko Everett는 Girls for Change의 설립자로, 청소년과 성인이 자신감을 기르고 리더십을 발휘하도록 돕습니다.',
+  },
+  {
+    id: 'the-art-of-being-yourself',
+    title: 'The art of being yourself',
+    speaker: 'Caroline McHugh',
+    topic: '자신만의 정체성을 발견하고 표현하기',
+    youtubeId: 'veEQQ-N9xWU',
+    durationSeconds: 1080,
+    publishedAt: '2013-06-01',
+    tags: ['정체성', '자기계발', '리더십'],
+    shortDescription:
+      '남이 기대하는 모습이 아니라 진짜 자신을 표현하는 데 필요한 태도를 이야기합니다.',
+    speakerBio:
+      'Caroline McHugh는 아이덴티티 컨설턴트로, 기업과 개인이 고유한 브랜드와 목소리를 찾도록 돕습니다.',
+  },
+  {
+    id: 'theres-more-to-life-than-being-happy',
+    title: "There's more to life than being happy",
+    speaker: 'Emily Esfahani Smith',
+    topic: '행복을 넘어 의미 있는 삶을 설계하기',
+    youtubeId: 'Y9zMYszm2c8',
+    durationSeconds: 780,
+    publishedAt: '2017-01-01',
+    tags: ['의미', '행복', '철학'],
+    shortDescription:
+      '의미 있는 삶의 네 가지 기둥을 소개하며 행복을 새롭게 정의합니다.',
+    speakerBio:
+      'Emily Esfahani Smith는 작가이자 저널리스트로, 행복과 의미의 교차점을 연구하며 스토리텔링으로 전달합니다.',
+  },
+  {
+    id: 'all-it-takes-is-10-mindful-minutes',
+    title: 'All it takes is 10 mindful minutes',
+    speaker: 'Andy Puddicombe',
+    topic: '매일 10분의 마음챙김이 주는 효과',
+    youtubeId: 'qzR62JJCMBQ',
+    durationSeconds: 600,
+    publishedAt: '2012-06-01',
+    tags: ['명상', '웰빙', '집중력'],
+    shortDescription:
+      '간단한 마음챙김 훈련으로 분주한 마음을 다스리고 집중력을 되찾는 방법을 안내합니다.',
+    speakerBio:
+      'Andy Puddicombe는 전직 승려이자 Headspace 공동 창업자로, 명상을 대중에게 알기 쉽게 전파하고 있습니다.',
+  },
+  {
+    id: 'the-power-of-belief-mindset-and-success',
+    title: 'The power of belief — mindset and success',
+    speaker: 'Eduardo Briceño',
+    topic: '성공을 가르는 신념과 학습 마인드셋',
+    youtubeId: 'pN34FNbOKXc',
+    durationSeconds: 1005,
+    publishedAt: '2012-10-01',
+    tags: ['교육', '성장', '마인드셋'],
+    shortDescription:
+      '성장 구역과 성과 구역을 구분해 꾸준한 성장을 이끄는 전략을 제시합니다.',
+    speakerBio:
+      'Eduardo Briceño는 Mindset Works의 공동 창업자로, 성장 마인드셋을 학교와 기업에 확산시키는 교육가입니다.',
+  },
+  {
+    id: 'why-some-people-find-exercise-harder-than-others',
+    title: 'Why some people find exercise harder than others',
+    speaker: 'Emily Balcetis',
+    topic: '운동을 어렵게 느끼는 인지적 이유',
+    youtubeId: 'kTT7QbxX6Hk',
+    durationSeconds: 780,
+    publishedAt: '2014-11-01',
+    tags: ['건강', '심리학', '동기부여'],
+    shortDescription:
+      '지각과 목표 설정이 운동 경험을 어떻게 변화시키는지 연구 결과를 통해 설명합니다.',
+    speakerBio:
+      'Emily Balcetis는 뉴욕 대학교 심리학 교수로, 시각과 인지가 동기부여에 미치는 영향을 연구합니다.',
+  },
+  {
+    id: 'the-fringe-benefits-of-failure',
+    title: 'The fringe benefits of failure',
+    speaker: 'J.K. Rowling',
+    topic: '실패에서 배우는 회복력과 상상력',
+    youtubeId: 'wHGqp8lz36c',
+    durationSeconds: 1100,
+    publishedAt: '2008-06-05',
+    tags: ['회복탄력성', '창의성', '삶'],
+    shortDescription:
+      '실패와 상상력의 힘을 통해 두려움을 넘어서는 법을 졸업 축사로 전합니다.',
+    speakerBio:
+      'J.K. Rowling은 해리포터 시리즈의 작가로, 창의적인 이야기와 사회적 기여로 전 세계 독자의 사랑을 받고 있습니다.',
+  },
+  {
+    id: 'the-orchestra-in-my-mouth',
+    title: 'The orchestra in my mouth',
+    speaker: 'Tom Thum',
+    topic: '비트박스가 만드는 다채로운 사운드 세계',
+    youtubeId: 'Dz6G60mAHvU',
+    durationSeconds: 870,
+    publishedAt: '2013-06-01',
+    tags: ['음악', '창의성', '퍼포먼스'],
+    shortDescription:
+      '한 사람의 입으로 펼쳐지는 놀라운 소리와 리듬의 가능성을 선보입니다.',
+    speakerBio:
+      'Tom Thum은 호주의 비트박서이자 음악가로, 다양한 장르의 소리를 모방하고 재구성하는 공연으로 유명합니다.',
+  },
+  {
+    id: 'teach-girls-bravery-not-perfection',
+    title: 'Teach girls bravery, not perfection',
+    speaker: 'Reshma Saujani',
+    topic: '완벽보다 용기를 가르치는 교육',
+    youtubeId: 'F4ZGxvPMHmE',
+    durationSeconds: 780,
+    publishedAt: '2016-02-01',
+    tags: ['교육', '여성', '용기'],
+    shortDescription:
+      '실패를 두려워하지 않는 용기가 소녀들의 미래를 바꿀 수 있음을 강조합니다.',
+    speakerBio:
+      'Reshma Saujani는 Girls Who Code의 창립자로, 소녀들에게 코딩과 리더십 기회를 제공하며 성평등을 촉진합니다.',
+  },
+  {
+    id: 'the-next-outbreak-were-not-ready',
+    title: "The next outbreak? We're not ready",
+    speaker: 'Bill Gates',
+    topic: '전염병 대비와 글로벌 보건 체계 강화',
+    youtubeId: '6Af6b_wyiwI',
+    durationSeconds: 510,
+    publishedAt: '2015-03-01',
+    tags: ['보건', '미래', '정책'],
+    shortDescription:
+      '다음 전염병에 대비하기 위한 감시, 연구, 협력 체계의 필요성을 경고합니다.',
+    speakerBio:
+      'Bill Gates는 마이크로소프트 공동 창업자이자 자선가로, 전염병 대비와 공중보건 향상을 위해 전 세계 프로젝트를 지원합니다.',
+  },
+  {
+    id: 'what-makes-a-hero',
+    title: 'What makes a hero?',
+    speaker: 'Matthew Winkler',
+    topic: '영웅의 여정 구조로 삶의 변화를 이해하기',
+    youtubeId: 'Hhk4N9A0oCA',
+    durationSeconds: 420,
+    publishedAt: '2012-09-01',
+    tags: ['스토리텔링', '영웅', '내러티브'],
+    shortDescription:
+      '고전적인 영웅의 여정이 현대인의 성장 이야기와 어떻게 연결되는지 설명합니다.',
+    speakerBio:
+      'Matthew Winkler는 TED-Ed의 편집장으로, 교육용 애니메이션을 통해 복잡한 개념을 쉽게 풀어냅니다.',
+  },
+  {
+    id: 'the-surprising-habits-of-original-thinkers',
+    title: 'The surprising habits of original thinkers',
+    speaker: 'Adam Grant',
+    topic: '독창적인 사람들이 아이디어를 발전시키는 습관',
+    youtubeId: 'fxbCHn6gE3U',
+    durationSeconds: 900,
+    publishedAt: '2016-02-01',
+    tags: ['창의성', '조직', '심리학'],
+    shortDescription:
+      '미루기와 실험이 어떻게 창의적인 결과로 이어지는지 데이터를 통해 보여줍니다.',
+    speakerBio:
+      'Adam Grant는 와튼스쿨의 조직심리학 교수로, 기부와 협력, 창의성에 대한 연구를 수행합니다.',
+  },
+  {
+    id: 'the-future-were-building-and-boring',
+    title: "The future we're building -- and boring",
+    speaker: 'Elon Musk',
+    topic: '우주, 에너지, 교통의 미래 청사진',
+    youtubeId: 'zIwLWfaAg-8',
+    durationSeconds: 2520,
+    publishedAt: '2017-04-01',
+    tags: ['기술', '미래', '혁신'],
+    shortDescription:
+      '우주 탐사, 전기차, 지하 교통망 등 미래 인프라에 대한 비전을 공유합니다.',
+    speakerBio:
+      'Elon Musk는 테슬라와 스페이스X의 CEO로, 지속 가능한 에너지와 다행성 인류를 목표로 혁신을 이끕니다.',
+  },
+  {
+    id: 'a-simple-way-to-break-a-bad-habit',
+    title: 'A simple way to break a bad habit',
+    speaker: 'Judson Brewer',
+    topic: '나쁜 습관을 끊는 마음챙김 기반 전략',
+    youtubeId: '-moW9jvvMr4',
+    durationSeconds: 930,
+    publishedAt: '2016-01-01',
+    tags: ['습관', '마음챙김', '건강'],
+    shortDescription:
+      '갈망을 알아차리고 새로운 보상 루프를 만드는 훈련을 소개합니다.',
+    speakerBio:
+      'Judson Brewer는 정신과 의사이자 연구자로, 중독과 습관 형성에 마음챙김이 어떻게 작용하는지 연구합니다.',
+  },
+  {
+    id: 'how-to-gain-control-of-your-free-time',
+    title: 'How to gain control of your free time',
+    speaker: 'Laura Vanderkam',
+    topic: '시간 사용을 재구성해 우선순위에 집중하기',
+    youtubeId: 'n3kNlFMXslo',
+    durationSeconds: 720,
+    publishedAt: '2016-11-01',
+    tags: ['시간관리', '자기계발', '생산성'],
+    shortDescription:
+      '시간은 발견하는 것이 아니라 만들어내는 것임을 이야기하며 계획 전략을 제시합니다.',
+    speakerBio:
+      'Laura Vanderkam은 시간 관리 전문가이자 작가로, 바쁜 사람들의 일정 데이터를 분석하여 효율적인 사용법을 제공합니다.',
+  },
+  {
+    id: 'what-i-learned-from-going-blind-in-space',
+    title: 'What I learned from going blind in space',
+    speaker: 'Chris Hadfield',
+    topic: '극한 상황에서도 침착함을 유지하는 훈련',
+    youtubeId: 'Zo62S0ulqhA',
+    durationSeconds: 1020,
+    publishedAt: '2014-04-01',
+    tags: ['우주', '리더십', '회복탄력성'],
+    shortDescription:
+      '우주에서의 위기 경험을 바탕으로 대비 훈련과 침착함의 중요성을 이야기합니다.',
+    speakerBio:
+      'Chris Hadfield는 캐나다 우주비행사로, 국제우주정거장 사령관을 역임하며 우주에서의 경험을 대중과 공유하고 있습니다.',
+  },
+  {
+    id: 'the-secrets-of-learning-a-new-language',
+    title: 'The secrets of learning a new language',
+    speaker: 'Lýdia Machová',
+    topic: '스스로 언어를 배우는 전략과 습관',
+    youtubeId: 't5zqrj-dR3w',
+    durationSeconds: 900,
+    publishedAt: '2019-04-01',
+    tags: ['언어학습', '습관', '동기부여'],
+    shortDescription:
+      '즐거움과 루틴을 결합해 여러 언어를 유창하게 배우는 비결을 공유합니다.',
+    speakerBio:
+      'Lýdia Machová는 폴리글롯 코치로, 8개 이상의 언어를 스스로 익히며 학습 전략을 전파합니다.',
+  },
+  {
+    id: 'how-to-stay-calm-when-you-know-youll-be-stressed',
+    title: "How to stay calm when you know you'll be stressed",
+    speaker: 'Daniel Levitin',
+    topic: '스트레스 상황을 대비하는 사고 훈련',
+    youtubeId: '8jPQjjsBbIc',
+    durationSeconds: 780,
+    publishedAt: '2014-09-01',
+    tags: ['스트레스', '의사결정', '건강'],
+    shortDescription:
+      '사전 점검 목록과 계획이 스트레스 상황에서 실수를 줄이는 방법을 설명합니다.',
+    speakerBio:
+      'Daniel Levitin은 신경과학자이자 작가로, 음악과 뇌, 의사결정에 관한 연구로 알려져 있습니다.',
+  },
+  {
+    id: 'the-gift-and-power-of-emotional-courage',
+    title: 'The gift and power of emotional courage',
+    speaker: 'Susan David',
+    topic: '감정을 수용하고 가치에 맞게 행동하기',
+    youtubeId: 'NDN3g6fRKqY',
+    durationSeconds: 924,
+    publishedAt: '2017-11-01',
+    tags: ['감정지능', '마음챙김', '심리학'],
+    shortDescription:
+      '감정을 억누르지 않고 호기심으로 대할 때 진정성 있는 삶을 살 수 있다고 강조합니다.',
+    speakerBio:
+      'Susan David는 하버드 의과대학 심리학자이자 작가로, 정서 민첩성과 리더십에 관한 연구와 컨설팅을 제공합니다.',
+  },
+];
 
-export const videosById = videos.reduce<Record<string, VideoDetail>>((accumulator, video) => {
-  accumulator[video.id] = video;
-  return accumulator;
-}, {});
+export const videos: VideoDetail[] = videoMetas.map(createVideo);

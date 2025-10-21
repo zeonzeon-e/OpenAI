@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+
+import { formatDuration } from '../utils/time';
 import { VideoSummary } from '../types/video';
 
 interface VideoCardProps {
@@ -6,10 +8,7 @@ interface VideoCardProps {
 }
 
 export const VideoCard = ({ video }: VideoCardProps) => {
-  const thumbnail = video.thumbnailUrl || '';
-  const duration = video.duration || '재생시간 미정';
-  const speaker = video.speaker || 'TED Speaker';
-  const description = video.shortDescription || '상세 설명이 준비 중입니다.';
+  const displayDuration = formatDuration(video.durationSeconds, video.duration);
 
   return (
     <Link
@@ -30,7 +29,7 @@ export const VideoCard = ({ video }: VideoCardProps) => {
           </div>
         )}
         <span className="absolute bottom-2 right-2 rounded-full bg-slate-950/80 px-2 py-1 text-xs font-semibold text-slate-100">
-          {duration}
+          {displayDuration}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-3 px-5 py-4">

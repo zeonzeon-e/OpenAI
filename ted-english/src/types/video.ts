@@ -20,6 +20,7 @@ export interface VideoSummary {
   speaker: string;
   thumbnailUrl: string;
   duration: string;
+  durationSeconds?: number;
   tags: string[];
   shortDescription: string;
   speakerSummary?: string;
@@ -46,4 +47,5 @@ export interface VideoDetail extends VideoSummary {
   publishedAt: string;
   learningObjectives: string[];
   transcript: TranscriptSegment[];
+  speakerBio: string;
 }
