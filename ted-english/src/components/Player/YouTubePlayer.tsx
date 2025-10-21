@@ -1,8 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import YouTube, { YouTubeEvent, YouTubePlayer } from 'react-youtube';
 import { TranscriptSegment } from '../../features/analyze/core/chunk';
 import { useAnalyzeStore } from '../../features/analyze/store/useAnalyzeStore';
 import { extractYouTubeId, formatTimestamp } from '../../utils/youtube';
+
+const YouTubeComponent = (YouTube as unknown) as React.ComponentType<any>;
 
 type YouTubePlayerProps = {
   videoUrl?: string;
@@ -66,10 +69,9 @@ export const YouTubePlayerEmbed = forwardRef<YouTubePlayerHandle, YouTubePlayerP
         </div>
       );
     }
-
     return (
-      <div className="space-y-4">
-        <YouTube
+      <div className="flex h-full flex-col gap-3">
+        <YouTubeComponent
           videoId={videoId}
           opts={{
             playerVars: {

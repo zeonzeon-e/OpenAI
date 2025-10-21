@@ -7,14 +7,14 @@ type SummaryPanelProps = {
   onJump?: (ref?: TimeRef) => void;
 };
 
-const SUMMARY_VARIANTS: Array<{ id: keyof Summary; label: string }> = [
+const SUMMARY_VARIANTS: Array<{ id: 'short' | 'medium' | 'long'; label: string }> = [
   { id: 'short', label: 'Short' },
   { id: 'medium', label: 'Medium' },
   { id: 'long', label: 'Long' },
 ];
 
 export const SummaryPanel = ({ summary, onJump }: SummaryPanelProps) => {
-  const [active, setActive] = useState<keyof Summary>('medium');
+  const [active, setActive] = useState<'short' | 'medium' | 'long'>('medium');
 
   if (!summary) {
     return <p className="text-sm text-slate-400">분석이 완료되면 요약이 여기에 표시됩니다.</p>;

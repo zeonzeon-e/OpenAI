@@ -12,6 +12,8 @@ import { YouTubePlayerEmbed, YouTubePlayerHandle } from '../components/Player/Yo
 import { TranscriptSegment } from '../features/analyze/core/chunk';
 import { AnalysisResult, TimeRef, analysisResultSchema } from '../features/analyze/core/schema';
 import { extractYouTubeId } from '../utils/youtube';
+import { TalksList } from '../components/TedTalks/TalksList';
+import { TedTalk } from '../features/tedtalks/types';
 
 const segmentsToInput = (segments: TranscriptSegment[]) =>
   JSON.stringify(
@@ -130,14 +132,24 @@ const Home = () => {
     playerRef.current?.seekTo(segment);
   };
 
+  const handleSelectTalk = (talk: TedTalk) => {
+    setTalkUrl(talk.canonicalUrl);
+    setConfig({ talkUrl: talk.canonicalUrl });
+  };
+
   const youtubeId = useMemo(() => extractYouTubeId(youtubeUrl ?? ''), [youtubeUrl]);
 
   return (
     <div className="space-y-6">
       <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow-lg">
+        <h2 className="mb-4 text-lg font-semibold text-slate-100">TED Talks 브라우저</h2>
+        <TalksList proxyUrl={proxyUrl} onSelectTalk={handleSelectTalk} autoRefreshMinutes={30} />
+      </section>
+
+      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow-lg">
         <h2 className="text-lg font-semibold text-slate-100">Transcript 입력</h2>
         <p className="mt-1 text-sm text-slate-400">
-          붙여넣기 또는 JSON 포맷(`[{{"start":"00:00","text":"..."}}]`)을 사용하세요. URL 스크래핑은 CORS 정책에 따라 제한될 수
+          붙여넣기 또는 JSON 포맷(<code>{`[{"start":"00:00","text":"..."}]`}</code>)을 사용하세요. URL 스크래핑은 CORS 정책에 따라 제한될 수
           있습니다.
         </p>
         <form onSubmit={handleTranscriptSubmit} className="mt-4 grid gap-4 lg:grid-cols-2">

@@ -86,11 +86,13 @@ export const useAnalyzeStore = create<AnalyzeStore>()(
     {
       name: 'analyze-settings',
       partialize: (state) => ({ config: state.config }),
-      merge: (persisted, current) => ({
-        ...current,
-        ...persisted,
-        config: { ...current.config, ...(persisted as { config?: AnalyzeConfig }).config },
-      }),
+      merge: (persisted, current) => {
+        const persistedData = persisted as { config?: AnalyzeConfig } | null;
+        return {
+          ...current,
+          config: { ...current.config, ...persistedData?.config },
+        };
+      },
     },
   ),
 );

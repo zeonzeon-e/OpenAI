@@ -51,7 +51,7 @@ export class LocalMockLLM implements LLMProvider {
     if (keyMessages.length === 0) {
       keyMessages.push({
         text: '연사의 이야기를 통해 변화의 계기를 찾을 수 있습니다.',
-        ref: { index: 0 },
+        ref: { timestamp: undefined, index: 0 },
       });
     }
     const summary: Summary = {
