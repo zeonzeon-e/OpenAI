@@ -31,22 +31,34 @@ export const VideoPage = () => {
           <div className="flex items-center gap-3 text-sm font-semibold text-brand-200">
             <LightBulbIcon className="h-5 w-5" /> 학습 포인트
           </div>
-          <ul className="space-y-3 text-sm text-slate-300">
-            {video.learningObjectives.map((objective) => (
-              <li key={objective} className="rounded-2xl bg-slate-950/60 p-4">
-                {objective}
-              </li>
-            ))}
-          </ul>
+          {video.learningObjectives.length > 0 ? (
+            <ul className="space-y-3 text-sm text-slate-300">
+              {video.learningObjectives.map((objective) => (
+                <li key={objective} className="rounded-2xl bg-slate-950/60 p-4">
+                  {objective}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-2xl bg-slate-950/60 p-4 text-sm text-slate-400">
+              이 강연의 학습 포인트는 곧 업데이트될 예정입니다.
+            </p>
+          )}
         </aside>
 
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-white">스크립트 & 학습 노트</h2>
-          <div className="grid gap-4">
-            {video.transcript.map((segment) => (
-              <TranscriptSegmentCard key={segment.start} segment={segment} />
-            ))}
-          </div>
+          {video.transcript.length > 0 ? (
+            <div className="grid gap-4">
+              {video.transcript.map((segment) => (
+                <TranscriptSegmentCard key={segment.start} segment={segment} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-slate-800 bg-slate-900/40 p-10 text-center text-sm text-slate-400">
+              스크립트는 현재 준비 중입니다. 잠시 후 다시 확인해 주세요.
+            </div>
+          )}
         </div>
       </section>
     </div>
