@@ -23,10 +23,27 @@ export interface VideoSummary {
   durationSeconds?: number;
   tags: string[];
   shortDescription: string;
+  speakerSummary?: string;
+}
+
+export interface VideoSource {
+  type: 'youtube' | 'ted' | 'external';
+  id: string;
+  embedUrl: string;
+  watchUrl: string;
+  providerName: string;
+}
+
+export interface VideoSource {
+  type: 'youtube' | 'ted' | 'external';
+  id: string;
+  embedUrl: string;
+  watchUrl: string;
+  providerName: string;
 }
 
 export interface VideoDetail extends VideoSummary {
-  youtubeId: string;
+  source: VideoSource;
   publishedAt: string;
   learningObjectives: string[];
   transcript: TranscriptSegment[];

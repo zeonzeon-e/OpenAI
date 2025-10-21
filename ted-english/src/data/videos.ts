@@ -91,6 +91,25 @@ const createTranscript = (meta: VideoMeta): TranscriptSegment[] => [
         partOfSpeech: 'noun',
         example: `Each insight on ${meta.topic} becomes a small invitation to act.`,
       },
+    ],
+  },
+  {
+    id: 'chimamanda_adichie_the_danger_of_a_single_story',
+    title: 'The danger of a single story',
+    speaker: 'Chimamanda Ngozi Adichie',
+    thumbnailUrl:
+      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/22c612e4-3925-43a7-9813-0ce8bf1f6382/ChimamandaAdichie_2009G-embed.jpg?w=800',
+    duration: '18:48',
+    tags: ['Storytelling', 'Culture'],
+    shortDescription: '치마만다 응고지 아디치에가 단일한 이야기의 위험성과 다양성의 중요성을 이야기합니다.',
+    source: buildTedSource('chimamanda_adichie_the_danger_of_a_single_story'),
+    publishedAt: '2009-07-01T00:00:00Z',
+    learningObjectives: [
+      '단일한 이야기가 편견을 만드는 방식 이해하기',
+      '다양한 관점을 수용하는 언어 표현 배우기',
+      '문화적 배경을 설명하는 어휘 확장하기',
+    ],
+    transcript: [
       {
         term: 'apply',
         definition: '적용하다',

@@ -15,6 +15,7 @@ const tabs = [
 type TabId = (typeof tabs)[number]['id'];
 
 export const VideoPage = () => {
+  const [activeTab, setActiveTab] = useState<'transcript' | 'speaker'>('transcript');
   const video = useVideoById();
   const [activeTab, setActiveTab] = useState<TabId>('transcript');
 
@@ -31,6 +32,10 @@ export const VideoPage = () => {
       </div>
     );
   }
+
+  const publishedLabel = video.publishedAt
+    ? new Date(video.publishedAt).toLocaleDateString('ko-KR')
+    : '발표일 미정';
 
   return (
     <div className="space-y-12">
