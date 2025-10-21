@@ -1,11 +1,9 @@
-import { useEffect } from 'react';
 import { useTalksStore } from '../../features/tedtalks/store/useTalksStore';
 import { TedTalk } from '../../features/tedtalks/types';
 
 type TalksListProps = {
   proxyUrl?: string;
   onSelectTalk?: (talk: TedTalk) => void;
-  autoRefreshMinutes?: number;
 };
 
 const formatDuration = (seconds: number): string => {
@@ -26,29 +24,17 @@ const formatDate = (isoDate: string): string => {
   }
 };
 
-export const TalksList = ({ proxyUrl, onSelectTalk, autoRefreshMinutes }: TalksListProps) => {
-  const { talks, status, error, lastFetched, useMockData, setUseMockData, fetchTalks, clearError } = useTalksStore();
+export const TalksList = ({ proxyUrl, onSelectTalk }: TalksListProps) => {
+  const talks = useTalksStore((state) => state.talks);
+  const status = useTalksStore((state) => state.status);
+  const error = useTalksStore((state) => state.error);
+  const lastFetched = useTalksStore((state) => state.lastFetched);
+  const useMockData = useTalksStore((state) => state.useMockData);
+  const setUseMockData = useTalksStore((state) => state.setUseMockData);
+  const fetchTalks = useTalksStore((state) => state.fetchTalks);
+  const clearError = useTalksStore((state) => state.clearError);
 
-  useEffect(() => {
-    if (talks.length === 0) {
-      void fetchTalks(proxyUrl);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!autoRefreshMinutes) return;
-
-    const interval = setInterval(
-      () => {
-        void fetchTalks(proxyUrl);
-      },
-      autoRefreshMinutes * 60 * 1000
-    );
-
-    return () => clearInterval(interval);
-  }, [autoRefreshMinutes, proxyUrl]);
-
-  const handleRefresh = () => {
+  const handleLoadTalks = () => {
     void fetchTalks(proxyUrl);
   };
 
@@ -79,11 +65,11 @@ export const TalksList = ({ proxyUrl, onSelectTalk, autoRefreshMinutes }: TalksL
           </label>
           <button
             type="button"
-            onClick={handleRefresh}
+            onClick={handleLoadTalks}
             disabled={status === 'loading'}
-            className="rounded bg-slate-800 px-3 py-1 text-xs font-medium text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+            className="rounded bg-orange-500 px-3 py-1 text-xs font-medium text-slate-900 transition hover:bg-orange-400 disabled:opacity-50"
           >
-            {status === 'loading' ? '로딩 중...' : '새로고침'}
+            {status === 'loading' ? '로딩 중...' : talks.length > 0 ? '새로고침' : '불러오기'}
           </button>
         </div>
       </div>
@@ -98,6 +84,12 @@ export const TalksList = ({ proxyUrl, onSelectTalk, autoRefreshMinutes }: TalksL
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {status === 'idle' && talks.length === 0 && (
+        <div className="rounded-md border border-slate-800 bg-slate-900/60 p-6 text-center text-sm text-slate-400">
+          "불러오기" 버튼을 클릭하여 TED 강연 목록을 가져오세요.
         </div>
       )}
 

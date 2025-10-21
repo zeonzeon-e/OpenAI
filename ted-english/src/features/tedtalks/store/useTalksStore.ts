@@ -4,20 +4,25 @@ import { fetchLatestTedTalks, getMockTedTalks } from '../api/fetchTalks';
 
 export type TalksStatus = 'idle' | 'loading' | 'success' | 'error';
 
-export type TalksStore = {
+type TalksState = {
   talks: TedTalk[];
   status: TalksStatus;
   error?: string;
   lastFetched?: Date;
   selectedTalk?: TedTalk;
   useMockData: boolean;
+};
+
+type TalksActions = {
   setUseMockData: (useMock: boolean) => void;
   fetchTalks: (proxyUrl?: string) => Promise<void>;
   setSelectedTalk: (talk?: TedTalk) => void;
   clearError: () => void;
 };
 
-export const useTalksStore = create<TalksStore>((set, get) => ({
+export type TalksStore = TalksState & TalksActions;
+
+export const useTalksStore = create<TalksStore>()((set, get) => ({
   talks: [],
   status: 'idle',
   error: undefined,
@@ -25,9 +30,14 @@ export const useTalksStore = create<TalksStore>((set, get) => ({
   selectedTalk: undefined,
   useMockData: true,
 
-  setUseMockData: (useMock) => set({ useMockData: useMock }),
+  setUseMockData: (useMock) => {
+    set({ useMockData: useMock });
+  },
 
   fetchTalks: async (proxyUrl) => {
+    const currentStatus = get().status;
+    if (currentStatus === 'loading') return;
+
     set({ status: 'loading', error: undefined });
 
     try {
@@ -49,7 +59,11 @@ export const useTalksStore = create<TalksStore>((set, get) => ({
     }
   },
 
-  setSelectedTalk: (talk) => set({ selectedTalk: talk }),
+  setSelectedTalk: (talk) => {
+    set({ selectedTalk: talk });
+  },
 
-  clearError: () => set({ error: undefined }),
+  clearError: () => {
+    set({ error: undefined });
+  },
 }));

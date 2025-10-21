@@ -143,7 +143,7 @@ const Home = () => {
     <div className="space-y-6">
       <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow-lg">
         <h2 className="mb-4 text-lg font-semibold text-slate-100">TED Talks 브라우저</h2>
-        <TalksList proxyUrl={proxyUrl} onSelectTalk={handleSelectTalk} autoRefreshMinutes={30} />
+        <TalksList proxyUrl={proxyUrl} onSelectTalk={handleSelectTalk} />
       </section>
 
       <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow-lg">
