@@ -1,4 +1,6 @@
 import { CalendarDaysIcon, ClockIcon, UsersIcon } from '@heroicons/react/24/outline';
+
+import { formatDuration } from '../utils/time';
 import { VideoDetail } from '../types/video';
 
 interface VideoHeroProps {
@@ -6,6 +8,8 @@ interface VideoHeroProps {
 }
 
 export const VideoHero = ({ video }: VideoHeroProps) => {
+  const formattedDuration = formatDuration(video.durationSeconds, video.duration);
+
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950">
       <div className="grid gap-8 p-8 lg:grid-cols-[1.2fr,0.8fr] lg:items-center">
@@ -20,7 +24,7 @@ export const VideoHero = ({ video }: VideoHeroProps) => {
               <UsersIcon className="h-4 w-4 text-brand-200" /> {video.speaker}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3 py-1">
-              <ClockIcon className="h-4 w-4 text-brand-200" /> {video.duration}
+              <ClockIcon className="h-4 w-4 text-brand-200" /> {formattedDuration}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3 py-1">
               <CalendarDaysIcon className="h-4 w-4 text-brand-200" /> {new Date(video.publishedAt).toLocaleDateString('ko-KR')}
