@@ -167,6 +167,252 @@ const parseNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const parseDurationString = (value: string): number | undefined => {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    return Math.floor(Number.parseFloat(trimmed));
+  }
+
+  if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(trimmed)) {
+    const parts = trimmed.split(':').map((part) => Number.parseInt(part, 10));
+
+    if (parts.some((part) => Number.isNaN(part))) {
+      return undefined;
+    }
+
+    if (parts.length === 3) {
+      const [hours, minutes, seconds] = parts;
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    if (parts.length === 2) {
+      const [minutes, seconds] = parts;
+      return minutes * 60 + seconds;
+    }
+  }
+
+  const isoMatch = trimmed.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i);
+
+  if (isoMatch) {
+    const [, days, hours, minutes, seconds] = isoMatch;
+    const total =
+      (days ? Number.parseInt(days, 10) * 86400 : 0) +
+      (hours ? Number.parseInt(hours, 10) * 3600 : 0) +
+      (minutes ? Number.parseInt(minutes, 10) * 60 : 0) +
+      (seconds ? Number.parseInt(seconds, 10) : 0);
+
+    if (!Number.isNaN(total) && total > 0) {
+      return total;
+    }
+  }
+
+  return undefined;
+};
+
+const extractDurationValue = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return parseDurationString(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const parsed = extractDurationValue(item);
+      if (parsed !== undefined) {
+        return parsed;
+      }
+    }
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as UnknownRecord;
+    const possibleKeys = ['duration', 'seconds', 'value'];
+
+    for (const key of possibleKeys) {
+      if (key in record) {
+        const parsed = extractDurationValue(record[key]);
+        if (parsed !== undefined) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const extractDurationSecondsFromRecord = (record: UnknownRecord, visited = new Set<UnknownRecord>()): number | undefined => {
+  if (visited.has(record)) {
+    return undefined;
+  }
+
+  visited.add(record);
+
+  const durationKeys = [
+    'duration',
+    'duration_sec',
+    'duration_secs',
+    'duration_seconds',
+    'duration_in_seconds',
+    'talk_duration',
+    'actual_duration',
+    'video_duration',
+    'runtime',
+    'length',
+    'length_seconds',
+    'total_duration',
+  ];
+
+  for (const key of durationKeys) {
+    if (key in record) {
+      const parsed = extractDurationValue(record[key]);
+      if (parsed !== undefined) {
+        return parsed;
+      }
+    }
+  }
+
+  const nestedKeys = ['talk', 'media', 'video', 'player', 'resources', 'data', 'attributes', 'meta'];
+
+  for (const key of nestedKeys) {
+    const nested = record[key];
+
+    if (Array.isArray(nested)) {
+      for (const item of nested) {
+        if (item && typeof item === 'object') {
+          const parsed = extractDurationSecondsFromRecord(item as UnknownRecord, visited);
+          if (parsed !== undefined) {
+            return parsed;
+          }
+        } else {
+          const parsed = extractDurationValue(item);
+          if (parsed !== undefined) {
+            return parsed;
+          }
+        }
+      }
+    } else if (nested && typeof nested === 'object') {
+      const parsed = extractDurationSecondsFromRecord(nested as UnknownRecord, visited);
+      if (parsed !== undefined) {
+        return parsed;
+      }
+    } else if (nested !== undefined) {
+      const parsed = extractDurationValue(nested);
+      if (parsed !== undefined) {
+        return parsed;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const deriveSpeakerSummary = (speaker: string, title: string, description: string) => {
+  const trimmedSpeaker = speaker.trim();
+  const trimmedDescription = normaliseWhitespace(description);
+
+  if (trimmedSpeaker && trimmedDescription) {
+    return `${trimmedSpeaker}의 TED 강연자로, ${trimmedDescription}`;
+  }
+
+  if (trimmedSpeaker) {
+    return `${trimmedSpeaker}의 TED 강연자 소개는 준비 중입니다.`;
+  }
+
+  if (trimmedDescription) {
+    return `${title} 강연자는 ${trimmedDescription}`;
+  }
+
+  return `${title} 강연자의 소개는 준비 중입니다.`;
+};
+
+const extractSpeakerSummary = (value: UnknownRecord): string | undefined => {
+  const candidates: string[] = [];
+
+  const addCandidate = (input: unknown) => {
+    if (typeof input === 'string') {
+      const trimmed = normaliseWhitespace(input);
+      if (trimmed.length > 0) {
+        candidates.push(trimmed);
+      }
+    }
+  };
+
+  const candidateKeys = [
+    'speaker_bio',
+    'speaker_biography',
+    'speaker_description',
+    'speaker_blurb',
+    'speaker_summary',
+    'speaker_about',
+    'speaker_profile',
+    'speaker_info',
+    'speaker_highlight',
+    'bio',
+    'biography',
+    'about',
+    'subtitle',
+    'what_they_do',
+    'profile',
+  ];
+
+  candidateKeys.forEach((key) => {
+    if (key in value) {
+      addCandidate(value[key]);
+    }
+  });
+
+  const nestedSpeakerKeys = ['speakers', 'speaker_details', 'primary_speaker', 'main_speaker'];
+
+  nestedSpeakerKeys.forEach((key) => {
+    const nested = value[key];
+
+    if (Array.isArray(nested)) {
+      nested.forEach((item) => {
+        if (item && typeof item === 'object') {
+          candidateKeys.forEach((nestedKey) => {
+            if (nestedKey in (item as UnknownRecord)) {
+              addCandidate((item as UnknownRecord)[nestedKey]);
+            }
+          });
+          addCandidate((item as UnknownRecord).description);
+        } else {
+          addCandidate(item);
+        }
+      });
+    } else if (nested && typeof nested === 'object') {
+      candidateKeys.forEach((nestedKey) => {
+        if (nestedKey in (nested as UnknownRecord)) {
+          addCandidate((nested as UnknownRecord)[nestedKey]);
+        }
+      });
+      addCandidate((nested as UnknownRecord).description);
+    }
+  });
+
+  const longCandidate = candidates.find((text) => text.length > 40);
+
+  if (longCandidate) {
+    return longCandidate;
+  }
+
+  const mediumCandidate = candidates.find((text) => text.length > 20);
+
+  if (mediumCandidate) {
+    return mediumCandidate;
+  }
+
+  return candidates[0];
+};
+
 const buildYoutubeSource = (youtubeId: string): VideoSource => ({
   type: 'youtube',
   id: youtubeId,
@@ -411,7 +657,7 @@ const buildVideoFromTed = (entry: UnknownRecord): VideoDetail | null => {
     .filter(isNonEmptyString)
     .map((candidate) => candidate.trim())[0] || `${title} 영상에서 소개하는 아이디어를 들어 보세요.`;
 
-  const durationSeconds = parseNumber(entry.duration);
+  const durationSeconds = extractDurationSecondsFromRecord(entry);
 
   const publishedAt = [entry.published_at, entry.released_at, entry.recorded_at, entry.filmed_at]
     .filter(isNonEmptyString)
@@ -432,6 +678,7 @@ const buildVideoFromTed = (entry: UnknownRecord): VideoDetail | null => {
 
   const objectives = generateLearningObjectives(title, description);
   const transcript = buildTranscriptFromDescription(title, description);
+  const speakerSummary = extractSpeakerSummary(entry) ?? deriveSpeakerSummary(speaker, title, description);
 
   const source = buildTedSource(slug || id, watchUrl);
 
@@ -443,6 +690,7 @@ const buildVideoFromTed = (entry: UnknownRecord): VideoDetail | null => {
     duration: formatDuration(durationSeconds) || '재생시간 미정',
     tags,
     shortDescription: description,
+    speakerSummary,
     source,
     publishedAt,
     learningObjectives: objectives,
@@ -642,53 +890,59 @@ const parseYoutubeFeed = (xmlText: string) => {
     throw new Error('YouTube 피드를 파싱할 수 없습니다.');
   }
 
-  return Array.from(doc.getElementsByTagName('entry'))
-    .map((entry) => {
-      const getText = (selector: string) => entry.querySelector(selector)?.textContent?.trim() ?? '';
-      const getAttr = (selector: string, attribute: string) => entry.querySelector(selector)?.getAttribute(attribute) ?? '';
+  const entries = Array.from(doc.getElementsByTagName('entry'));
+  const results: VideoDetail[] = [];
 
-      const youtubeId = getText('yt\\:videoId');
+  entries.forEach((entry) => {
+    const getText = (selector: string) => entry.querySelector(selector)?.textContent?.trim() ?? '';
+    const getAttr = (selector: string, attribute: string) => entry.querySelector(selector)?.getAttribute(attribute) ?? '';
 
-      if (!youtubeId) {
-        return undefined;
-      }
+    const youtubeId = getText('yt\\:videoId');
 
-      const title = getText('title') || '제목 미정';
-      const author = getText('author > name') || 'TED';
-      const publishedAt = getText('published');
-      const description = getText('media\\:description');
-      const durationRaw = getAttr('yt\\:duration', 'seconds');
-      const durationSeconds = durationRaw ? Number.parseInt(durationRaw, 10) : undefined;
-      const thumbnailUrl =
-        getAttr('media\\:thumbnail', 'url') || `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-      const tags = Array.from(entry.querySelectorAll('media\\:category'))
-        .map((node) => node.textContent?.trim())
-        .filter((tag): tag is string => Boolean(tag) && tag.length > 0);
+    if (!youtubeId) {
+      return;
+    }
 
-      const shortDescription =
-        description.split(/\r?\n/).find((line) => line.trim().length > 0) ?? `${title} 영상에서 소개하는 아이디어를 들어 보세요.`;
+    const title = getText('title') || '제목 미정';
+    const author = getText('author > name') || 'TED';
+    const publishedAt = getText('published');
+    const description = getText('media\\:description');
+    const durationRaw = getAttr('yt\\:duration', 'seconds');
+    const durationAlt = getAttr('media\\:content', 'duration');
+    const durationSeconds =
+      (durationRaw ? parseDurationString(durationRaw) : undefined) ??
+      (durationAlt ? parseDurationString(durationAlt) : undefined);
+    const thumbnailUrl =
+      getAttr('media\\:thumbnail', 'url') || `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    const tags = Array.from(entry.querySelectorAll('media\\:category'))
+      .map((node) => node.textContent?.trim())
+      .filter((tag): tag is string => Boolean(tag) && tag.length > 0);
 
-      return {
-        id: youtubeId,
-        title,
-        speaker: author || 'TED Speaker',
-        thumbnailUrl,
-        duration: formatDuration(durationSeconds),
-        tags,
-        shortDescription,
-        source: buildYoutubeSource(youtubeId),
-        publishedAt,
-        learningObjectives: generateLearningObjectives(title, description),
-        transcript: buildTranscriptFromDescription(title, description),
-      } satisfies VideoDetail;
-    })
-    .filter((video): video is VideoDetail => Boolean(video))
-    .sort((a, b) => {
-      const left = a.publishedAt ? Date.parse(a.publishedAt) : 0;
-      const right = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+    const shortDescription =
+      description.split(/\r?\n/).find((line) => line.trim().length > 0) ?? `${title} 영상에서 소개하는 아이디어를 들어 보세요.`;
 
-      return right - left;
+    results.push({
+      id: youtubeId,
+      title,
+      speaker: author || 'TED Speaker',
+      thumbnailUrl,
+      duration: formatDuration(durationSeconds),
+      tags,
+      shortDescription,
+      speakerSummary: deriveSpeakerSummary(author || 'TED Speaker', title, shortDescription),
+      source: buildYoutubeSource(youtubeId),
+      publishedAt,
+      learningObjectives: generateLearningObjectives(title, description),
+      transcript: buildTranscriptFromDescription(title, description),
     });
+  });
+
+  return results.sort((a, b) => {
+    const left = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+    const right = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+
+    return right - left;
+  });
 };
 
 const fetchYoutubeVideos = async (): Promise<VideoDetail[]> => {
@@ -764,6 +1018,9 @@ const mergeWithLocal = (video: VideoDetail): VideoDetail => {
       duration: video.duration || '재생시간 미정',
       tags: video.tags.length > 0 ? video.tags : ['TED'],
       shortDescription: video.shortDescription || '영상 설명이 준비 중입니다.',
+      speakerSummary:
+        video.speakerSummary ||
+        deriveSpeakerSummary(video.speaker, video.title, video.shortDescription || video.title),
       learningObjectives:
         video.learningObjectives.length > 0 ? video.learningObjectives : ['영상의 주요 메시지를 정리해 보세요.'],
       transcript: video.transcript,
@@ -777,6 +1034,14 @@ const mergeWithLocal = (video: VideoDetail): VideoDetail => {
     duration: video.duration || local.duration,
     tags: video.tags.length > 0 ? video.tags : local.tags,
     shortDescription: video.shortDescription || local.shortDescription,
+    speakerSummary:
+      video.speakerSummary ||
+      local.speakerSummary ||
+      deriveSpeakerSummary(
+        video.speaker || local.speaker,
+        video.title || local.title,
+        video.shortDescription || local.shortDescription,
+      ),
     source: video.source || local.source,
     publishedAt: video.publishedAt || local.publishedAt,
     learningObjectives: video.learningObjectives.length > 0 ? video.learningObjectives : local.learningObjectives,

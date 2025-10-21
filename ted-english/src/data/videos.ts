@@ -64,6 +64,25 @@ const buildPlaceholderObjectives = (title: string): string[] => [
   '주제를 자신의 경험과 연결해 영어로 말하기',
 ];
 
+const buildSpeakerSummary = (speaker: string, title: string, description: string) => {
+  const trimmedSpeaker = speaker.trim();
+  const trimmedDescription = description.replace(/\s+/g, ' ').trim();
+
+  if (trimmedSpeaker && trimmedDescription) {
+    return `${trimmedSpeaker}의 TED 강연자로, ${trimmedDescription}`;
+  }
+
+  if (trimmedSpeaker) {
+    return `${trimmedSpeaker}의 TED 강연자 소개는 준비 중입니다.`;
+  }
+
+  if (trimmedDescription) {
+    return `${title} 강연자는 ${trimmedDescription}`;
+  }
+
+  return `${title} 강연자의 소개는 준비 중입니다.`;
+};
+
 type PlaceholderVideoSeed = {
   id: string;
   title: string;
@@ -87,6 +106,7 @@ const createFallbackVideo = (seed: PlaceholderVideoSeed): VideoDetail => {
     duration: seed.duration ?? '재생시간 미정',
     tags: seed.tags,
     shortDescription: seed.shortDescription,
+    speakerSummary: buildSpeakerSummary(seed.speaker, seed.title, seed.shortDescription),
     source,
     publishedAt: seed.publishedAt,
     learningObjectives: buildPlaceholderObjectives(seed.title),
@@ -190,25 +210,6 @@ const baseVideos: VideoDetail[] = [
           },
         ],
       },
-    ],
-  },
-  {
-    id: 'sir_ken_robinson_do_schools_kill_creativity',
-    title: 'Do schools kill creativity?',
-    speaker: 'Sir Ken Robinson',
-    thumbnailUrl:
-      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/01b0b405-c448-4b24-a9dc-7ad0dbff25dc/SirKenRobinson_2006-embed.jpg?w=800',
-    duration: '19:24',
-    tags: ['Education', 'Creativity'],
-    shortDescription: '켄 로빈슨 경이 교육 시스템이 창의성을 억누르는 방식과 그 대안을 제시합니다.',
-    source: buildTedSource('sir_ken_robinson_do_schools_kill_creativity'),
-    publishedAt: '2006-02-01T00:00:00Z',
-    learningObjectives: [
-      '교육 현장에서 창의성을 지키는 전략 살펴보기',
-      '실패와 학습의 관계에 대한 관점 이해하기',
-      '다양한 재능을 존중하는 수업 설계 방안 고민하기',
-    ],
-    transcript: [
       {
         start: 60,
         end: 120,
@@ -270,6 +271,25 @@ const baseVideos: VideoDetail[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    id: 'chimamanda_adichie_the_danger_of_a_single_story',
+    title: 'The danger of a single story',
+    speaker: 'Chimamanda Ngozi Adichie',
+    thumbnailUrl:
+      'https://pi.tedcdn.com/r/talkstar-photos.s3.amazonaws.com/uploads/22c612e4-3925-43a7-9813-0ce8bf1f6382/ChimamandaAdichie_2009G-embed.jpg?w=800',
+    duration: '18:48',
+    tags: ['Storytelling', 'Culture'],
+    shortDescription: '치마만다 응고지 아디치에가 단일한 이야기의 위험성과 다양성의 중요성을 이야기합니다.',
+    source: buildTedSource('chimamanda_adichie_the_danger_of_a_single_story'),
+    publishedAt: '2009-07-01T00:00:00Z',
+    learningObjectives: [
+      '단일한 이야기가 편견을 만드는 방식 이해하기',
+      '다양한 관점을 수용하는 언어 표현 배우기',
+      '문화적 배경을 설명하는 어휘 확장하기',
+    ],
+    transcript: [
       {
         start: 60,
         end: 120,
@@ -577,7 +597,12 @@ const fallbackVideoSeeds: PlaceholderVideoSeed[] = [
 
 const generatedFallbackVideos = fallbackVideoSeeds.map(createFallbackVideo);
 
-export const videos: VideoDetail[] = [...baseVideos, ...generatedFallbackVideos];
+const withSpeakerSummary = (video: VideoDetail): VideoDetail => ({
+  ...video,
+  speakerSummary: video.speakerSummary ?? buildSpeakerSummary(video.speaker, video.title, video.shortDescription),
+});
+
+export const videos: VideoDetail[] = [...baseVideos, ...generatedFallbackVideos].map(withSpeakerSummary);
 
 export const videosById = videos.reduce<Record<string, VideoDetail>>((accumulator, video) => {
   accumulator[video.id] = video;
