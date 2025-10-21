@@ -1,7 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const repository = process.env.GITHUB_REPOSITORY ?? '';
+const repository = (
+  (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process?.env
+    ?.GITHUB_REPOSITORY ?? ''
+);
 const [owner = '', repo = ''] = repository.split('/');
 const normalizedOwner = owner.toLowerCase();
 const normalizedRepo = repo.toLowerCase();
@@ -15,5 +18,11 @@ export default defineConfig({
   base: basePath,
   server: {
     port: 5173,
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/tests/setup.ts',
+    css: true,
   },
 });
