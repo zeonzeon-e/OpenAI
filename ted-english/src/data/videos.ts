@@ -122,3 +122,8 @@ export const videos: VideoDetail[] = [
     ],
   },
 ];
+
+export const videosById = videos.reduce<Record<string, VideoDetail>>((accumulator, video) => {
+  accumulator[video.id] = video;
+  return accumulator;
+}, {});
